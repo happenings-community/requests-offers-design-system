@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
 
-  let isApp = $derived(page.url.pathname.startsWith('/ui-kit/app'));
+  let isApp = $derived(page.url.pathname.startsWith('/app'));
   let current = $derived(page.url.pathname);
 
   const playbook = [
@@ -12,10 +12,11 @@
     { href: '/playbook/navigation', label: 'Navigation',  icon: '🧭' },
   ];
   const scenarios = [
-    { href: '/ui-kit/browse-active',         label: 'Browse Active',   icon: '🏠' },
-    { href: '/ui-kit/create-request',        label: 'Create Request',  icon: '📝' },
-    { href: '/ui-kit/admin-dashboard',       label: 'Admin',           icon: '⚙️' },
-    { href: '/ui-kit/connecting-onboarding', label: 'Connecting',      icon: '🔗' },
+    { href: '/app',                    label: 'Home',          icon: '🏠' },
+    { href: '/app/requests',           label: 'Requests',      icon: '📝' },
+    { href: '/app/offers',             label: 'Offers',        icon: '💡' },
+    { href: '/app/admin',              label: 'Admin',         icon: '⚙️' },
+    { href: '/app/connecting',         label: 'Connecting',    icon: '🔗' },
   ];
 </script>
 
@@ -32,7 +33,7 @@
         </div>
       </a>
 
-      <a href="/ui-kit/app" class="app-mode-btn">
+      <a href="/app" class="app-mode-btn">
         <span>🚀</span> App Mode
       </a>
 
@@ -49,8 +50,8 @@
         </div>
 
         <div class="ds-nav-section">
-          <a href="/ui-kit" class="ds-nav-group-label {current.startsWith('/ui-kit') && !current.startsWith('/ui-kit/app') ? 'is-active-group' : ''}">
-            🖼️ UI Kit Scenarios
+          <a href="/app" class="ds-nav-group-label {current.startsWith('/app') ? 'is-active-group' : ''}">
+            🖼️ App Prototype
           </a>
           {#each scenarios as link}
             <a href={link.href} class="ds-nav-item {current === link.href ? 'is-active' : ''}">

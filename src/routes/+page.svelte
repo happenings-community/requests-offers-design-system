@@ -11,7 +11,7 @@
     <h2 class="ds-h3">Explore</h2>
     <div class="nav-grid">
       <a href="/playbook" class="nav-card"><span class="nav-card-icon">📖</span><strong>Playbook</strong></a>
-      <a href="/ui-kit" class="nav-card"><span class="nav-card-icon">🖼️</span><strong>UI Kit</strong></a>
+      <a href="/app" class="nav-card"><span class="nav-card-icon">🖼️</span><strong>App Prototype</strong></a>
     </div>
   </section>
 </main>
