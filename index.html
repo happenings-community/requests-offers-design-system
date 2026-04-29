@@ -3,355 +3,733 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>hAppenings Community — Design System</title>
+<title>hAppenings — Design System</title>
 <link rel="icon" href="assets/icon.png" />
 <link rel="stylesheet" href="colors_and_type.css" />
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  html, body { height: 100%; }
+
   body {
-    background: rgb(var(--bg-muted));
     font-family: var(--font-base);
     color: rgb(var(--fg-1));
+    background: rgb(var(--bg-muted));
+    display: flex;
+    flex-direction: column;
     min-height: 100vh;
   }
 
-  /* ── Nav ── */
-  .nav {
+  /* ── Top bar ── */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
     background: rgb(var(--color-primary-500));
-    height: 64px;
+    height: 56px;
     display: flex;
     align-items: center;
-    padding: 0 32px;
-    gap: 16px;
+    padding: 0 20px;
+    gap: 12px;
     box-shadow: var(--shadow-lg);
+    flex-shrink: 0;
   }
-  .nav-logo {
-    width: 36px;
-    height: 36px;
+  .topbar-logo {
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     object-fit: contain;
-    background: rgb(var(--color-secondary-500));
+    flex-shrink: 0;
   }
-  .nav-wordmark {
+  .topbar-title {
     font-family: var(--font-display);
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
     color: #fff;
     letter-spacing: -0.01em;
+    white-space: nowrap;
   }
-  .nav-wordmark span { color: rgb(var(--color-tertiary-300)); }
-  .nav-badge {
-    margin-left: auto;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.6);
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
-    padding: 4px 12px;
-    border-radius: 9999px;
+  .topbar-title span { color: rgb(var(--color-tertiary-300)); }
+  .topbar-sep {
+    width: 1px;
+    height: 24px;
+    background: rgba(255,255,255,0.2);
+    flex-shrink: 0;
   }
-
-  /* ── Hero ── */
-  .hero {
-    background: linear-gradient(135deg, rgb(var(--color-primary-600)), rgb(var(--color-primary-400)));
-    padding: 56px 32px 48px;
-    text-align: center;
-    color: #fff;
-  }
-  .hero-eyebrow {
+  .topbar-label {
     font-size: 12px;
     font-weight: 600;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: rgb(var(--color-tertiary-300));
-    margin-bottom: 12px;
+    color: rgba(255,255,255,0.55);
+    white-space: nowrap;
   }
-  .hero-title {
-    font-size: 40px;
-    font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-    margin-bottom: 16px;
-  }
-  .hero-title em {
-    font-family: var(--font-display);
-    font-style: normal;
-    color: rgb(var(--color-secondary-400));
-  }
-  .hero-sub {
-    font-size: 17px;
-    color: rgba(255,255,255,0.75);
-    max-width: 540px;
-    margin: 0 auto 28px;
-    line-height: 1.55;
-  }
-  .hero-cta {
-    display: inline-block;
+  .topbar-spacer { flex: 1; }
+  .topbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     background: rgb(var(--color-secondary-500));
     color: #000;
+    font-size: 13px;
     font-weight: 600;
-    font-size: 14px;
-    padding: 11px 28px;
+    padding: 7px 16px;
     border-radius: 9999px;
     text-decoration: none;
+    white-space: nowrap;
     transition: background 0.15s;
+    flex-shrink: 0;
   }
-  .hero-cta:hover { background: rgb(var(--color-secondary-400)); }
+  .topbar-btn:hover { background: rgb(var(--color-secondary-400)); }
 
-  /* ── Page container ── */
-  .page { max-width: 960px; margin: 0 auto; padding: 48px 24px 64px; }
-
-  /* ── Section heading ── */
-  .section-label {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: rgb(var(--fg-2));
-    margin-bottom: 16px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgb(var(--border-1));
+  /* ── App shell ── */
+  .app {
+    display: flex;
+    flex: 1;
+    min-height: 0;
   }
 
-  /* ── Grid ── */
-  .grid { display: grid; gap: 16px; margin-bottom: 48px; }
-  .grid-2 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-  .grid-3 { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-
-  /* ── Card ── */
-  .card {
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
     background: rgb(var(--bg-elevated));
-    border: 1px solid rgb(var(--border-1));
-    border-radius: 8px;
-    padding: 24px;
-    text-decoration: none;
-    color: inherit;
+    border-right: 1px solid rgb(var(--border-1));
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.15s, border-color 0.15s;
+    overflow-y: auto;
+    position: sticky;
+    top: 56px;
+    height: calc(100vh - 56px);
   }
-  .card:hover {
-    box-shadow: var(--shadow-md);
-    border-color: rgb(var(--color-primary-300));
-  }
-  .card-icon { font-size: 28px; margin-bottom: 4px; }
-  .card-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: rgb(var(--fg-1));
-  }
-  .card-desc {
-    font-size: 13px;
-    color: rgb(var(--fg-2));
-    line-height: 1.5;
-  }
-  .card-tag {
-    display: inline-block;
-    margin-top: 4px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
+  .sidebar-inner { padding: 12px 0 24px; }
+
+  .nav-group { margin-bottom: 4px; }
+  .nav-group-label {
+    padding: 12px 16px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    padding: 3px 10px;
-    border-radius: 9999px;
+    color: rgb(var(--fg-3));
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgb(var(--fg-2));
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    text-decoration: none;
+    transition: background 0.1s, color 0.1s;
+    border-radius: 0;
+  }
+  .nav-item:hover {
     background: rgb(var(--color-primary-50));
     color: rgb(var(--color-primary-700));
   }
-  .card-tag.green {
-    background: rgb(var(--color-success-50));
-    color: rgb(var(--color-success-700));
+  .nav-item.active {
+    background: rgb(var(--color-primary-50));
+    color: rgb(var(--color-primary-700));
+    font-weight: 600;
+    box-shadow: inset 3px 0 0 rgb(var(--color-primary-500));
   }
-  .card-tag.gold {
-    background: rgb(var(--color-secondary-50));
-    color: rgb(var(--color-secondary-800));
+  .nav-item-ic { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+  .nav-external-ic { margin-left: auto; font-size: 10px; opacity: 0.5; }
+  .nav-divider {
+    height: 1px;
+    background: rgb(var(--border-1));
+    margin: 8px 12px;
   }
 
-  /* ── Code block ── */
-  .code-block {
-    background: rgb(var(--color-surface-800));
-    color: rgb(var(--color-surface-100));
-    font-family: var(--font-mono);
-    font-size: 13px;
-    padding: 16px 20px;
-    border-radius: 8px;
-    margin-bottom: 48px;
-    overflow-x: auto;
-    line-height: 1.6;
+  /* ── Content ── */
+  .content {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
   }
-  .code-block .comment { color: rgb(var(--color-surface-400)); }
-  .code-block .cmd { color: rgb(var(--color-secondary-300)); }
 
-  /* ── Footer ── */
-  .footer {
-    text-align: center;
+  /* ── Prototype card (shown when prototype tab active) ── */
+  .proto-card {
+    display: none;
+    flex-direction: column;
+    gap: 16px;
     padding: 32px;
-    font-size: 13px;
-    color: rgb(var(--fg-3));
-    border-top: 1px solid rgb(var(--border-1));
-    background: rgb(var(--bg-elevated));
+    max-width: 680px;
   }
-  .footer a { color: rgb(var(--fg-link)); text-decoration: none; }
-  .footer a:hover { text-decoration: underline; }
+  .proto-card.visible { display: flex; }
+  .proto-card-hero {
+    background: linear-gradient(135deg, rgb(var(--color-primary-600)), rgb(var(--color-primary-400)));
+    border-radius: 12px;
+    padding: 40px 36px;
+    color: #fff;
+  }
+  .proto-card-hero h2 {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    letter-spacing: -0.02em;
+  }
+  .proto-card-hero p {
+    font-size: 14px;
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 24px;
+    line-height: 1.55;
+  }
+  .proto-card-hero a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgb(var(--color-secondary-500));
+    color: #000;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 24px;
+    border-radius: 9999px;
+    text-decoration: none;
+  }
+  .proto-card-hero a:hover { background: rgb(var(--color-secondary-400)); }
+  .proto-screens {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px;
+  }
+  .proto-screen-pill {
+    font-size: 12px;
+    color: rgb(var(--fg-2));
+    background: rgb(var(--bg-elevated));
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 6px;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .proto-screen-pill span { opacity: 0.7; }
+
+  /* ── Preview iframe container ── */
+  .preview-frame-wrap {
+    display: none;
+    padding: 0;
+    height: 100%;
+  }
+  .preview-frame-wrap.visible { display: block; }
+  .preview-frame-wrap iframe {
+    width: 100%;
+    border: none;
+    display: block;
+  }
+
+  /* ── Loading state ── */
+  .preview-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 32px;
+    color: rgb(var(--fg-3));
+    font-size: 13px;
+    gap: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgb(var(--color-primary-200));
+    border-top-color: rgb(var(--color-primary-500));
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  /* ── Welcome panel ── */
+  .welcome-panel {
+    display: none;
+    flex-direction: column;
+    gap: 24px;
+    padding: 40px 32px;
+    max-width: 760px;
+  }
+  .welcome-panel.visible { display: flex; }
+
+  .welcome-hero {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .welcome-hero-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .welcome-hero-text h1 {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 700;
+    color: rgb(var(--color-primary-600));
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .welcome-hero-text h1 span { color: rgb(var(--color-tertiary-500)); }
+  .welcome-hero-text p {
+    font-size: 14px;
+    color: rgb(var(--fg-2));
+    margin-top: 6px;
+    line-height: 1.55;
+  }
+
+  .welcome-desc {
+    font-size: 14px;
+    color: rgb(var(--fg-2));
+    line-height: 1.6;
+    padding: 16px 20px;
+    background: rgb(var(--bg-elevated));
+    border: 1px solid rgb(var(--border-1));
+    border-left: 3px solid rgb(var(--color-primary-400));
+    border-radius: 6px;
+  }
+
+  .welcome-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+  .welcome-tile {
+    background: rgb(var(--bg-elevated));
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    font-family: inherit;
+  }
+  .welcome-tile:hover {
+    border-color: rgb(var(--color-primary-300));
+    box-shadow: var(--shadow-md);
+  }
+  .welcome-tile-ic { font-size: 22px; flex-shrink: 0; line-height: 1; }
+  .welcome-tile-body {}
+  .welcome-tile-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgb(var(--fg-1));
+  }
+  .welcome-tile-sub {
+    font-size: 12px;
+    color: rgb(var(--fg-3));
+    margin-top: 2px;
+  }
+
+  .welcome-proto {
+    background: linear-gradient(135deg, rgb(var(--color-primary-600)), rgb(var(--color-primary-400)));
+    border-radius: 10px;
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .welcome-proto-text { flex: 1; min-width: 200px; }
+  .welcome-proto-text h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .welcome-proto-text p {
+    font-size: 13px;
+    color: rgba(255,255,255,0.7);
+    line-height: 1.5;
+  }
+  .welcome-proto-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgb(var(--color-secondary-500));
+    color: #000;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 20px;
+    border-radius: 9999px;
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .welcome-proto-btn:hover { background: rgb(var(--color-secondary-400)); }
+
+  .welcome-section-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgb(var(--fg-3));
+    margin-bottom: 4px;
+  }
+
+  /* ── Mobile toggle ── */
+  .sidebar-toggle {
+    display: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    color: rgba(255,255,255,0.8);
+    font-size: 20px;
+  }
+
+  @media (max-width: 640px) {
+    .sidebar-toggle { display: block; }
+    .sidebar {
+      position: fixed;
+      top: 56px;
+      left: -220px;
+      z-index: 99;
+      transition: left 0.2s;
+      box-shadow: var(--shadow-xl);
+    }
+    .sidebar.open { left: 0; }
+    .topbar-label { display: none; }
+    .topbar-sep { display: none; }
+  }
 </style>
 </head>
 <body>
 
-<nav class="nav">
-  <img src="assets/icon.png" alt="" class="nav-logo" />
-  <span class="nav-wordmark">h<span>A</span>ppenings</span>
-  <span class="nav-badge">Design System · alpha</span>
-</nav>
+<!-- Top bar -->
+<header class="topbar">
+  <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle menu">☰</button>
+  <img src="assets/icon.png" alt="" class="topbar-logo" />
+  <span class="topbar-title">h<span>A</span>ppenings</span>
+  <span class="topbar-sep"></span>
+  <span class="topbar-label">Design System</span>
+  <span class="topbar-spacer"></span>
+  <a href="ui_kits/requests-and-offers/" target="_blank" class="topbar-btn">🖥️ Open prototype</a>
+</header>
 
-<div class="hero">
-  <p class="hero-eyebrow">hAppenings Community CIC</p>
-  <h1 class="hero-title">The <em>hAppenings</em> Design System</h1>
-  <p class="hero-sub">Color tokens, typography, components, and interactive prototypes for the Requests &amp; Offers peer-to-peer platform.</p>
-  <a href="ui_kits/requests-and-offers/" class="hero-cta">Open interactive prototype →</a>
+<!-- App shell -->
+<div class="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <nav class="sidebar-inner">
+
+      <div class="nav-group">
+        <button class="nav-item active" data-panel="welcome">
+          <span class="nav-item-ic">🏠</span> Welcome
+        </button>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Prototype</div>
+        <button class="nav-item" data-panel="proto">
+          <span class="nav-item-ic">🖥️</span> Requests &amp; Offers
+        </button>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Colors</div>
+        <button class="nav-item" data-src="preview/colors-primary.html">
+          <span class="nav-item-ic">🟣</span> Primary
+        </button>
+        <button class="nav-item" data-src="preview/colors-accents.html">
+          <span class="nav-item-ic">🎨</span> Accents
+        </button>
+        <button class="nav-item" data-src="preview/colors-semantic.html">
+          <span class="nav-item-ic">🎭</span> Semantic
+        </button>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Typography</div>
+        <button class="nav-item" data-src="preview/type-display.html">
+          <span class="nav-item-ic">✍️</span> Display
+        </button>
+        <button class="nav-item" data-src="preview/type-body.html">
+          <span class="nav-item-ic">¶</span> Body
+        </button>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Spacing &amp; Layout</div>
+        <button class="nav-item" data-src="preview/spacing.html">
+          <span class="nav-item-ic">↔️</span> Spacing
+        </button>
+        <button class="nav-item" data-src="preview/radii-shadows.html">
+          <span class="nav-item-ic">⬜</span> Radii &amp; Shadows
+        </button>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Components</div>
+        <button class="nav-item" data-src="preview/components-buttons.html">
+          <span class="nav-item-ic">🔘</span> Buttons
+        </button>
+        <button class="nav-item" data-src="preview/components-badges.html">
+          <span class="nav-item-ic">🏷️</span> Badges
+        </button>
+        <button class="nav-item" data-src="preview/components-cards.html">
+          <span class="nav-item-ic">🃏</span> Cards
+        </button>
+        <button class="nav-item" data-src="preview/components-inputs.html">
+          <span class="nav-item-ic">✏️</span> Inputs
+        </button>
+        <button class="nav-item" data-src="preview/components-nav.html">
+          <span class="nav-item-ic">🧭</span> Navigation
+        </button>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Brand</div>
+        <button class="nav-item" data-src="preview/logos.html">
+          <span class="nav-item-ic">🌟</span> Logos
+        </button>
+        <button class="nav-item" data-src="preview/iconography.html">
+          <span class="nav-item-ic">😀</span> Iconography
+        </button>
+      </div>
+
+      <div class="nav-divider"></div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Source</div>
+        <a class="nav-item" href="colors_and_type.css" target="_blank">
+          <span class="nav-item-ic">🎨</span> colors_and_type.css
+          <span class="nav-external-ic">↗</span>
+        </a>
+        <a class="nav-item" href="README.md" target="_blank">
+          <span class="nav-item-ic">📖</span> README
+          <span class="nav-external-ic">↗</span>
+        </a>
+        <a class="nav-item" href="CONTRIBUTING.md" target="_blank">
+          <span class="nav-item-ic">🤝</span> Contributing
+          <span class="nav-external-ic">↗</span>
+        </a>
+      </div>
+
+    </nav>
+  </aside>
+
+  <!-- Main content -->
+  <main class="content" id="content">
+
+    <!-- Welcome panel -->
+    <div class="welcome-panel visible" id="panel-welcome">
+
+      <div class="welcome-hero">
+        <img src="assets/icon.png" alt="hAppenings icon" class="welcome-hero-logo" />
+        <div class="welcome-hero-text">
+          <h1>h<span>A</span>ppenings<br>Design System</h1>
+          <p>Color tokens, typography, components, and interactive prototypes for the Requests &amp; Offers peer-to-peer platform.</p>
+        </div>
+      </div>
+
+      <div class="welcome-desc">
+        This is the community playground for hAppenings Community CIC. The production app is built on <strong>SvelteKit + TailwindCSS + Skeleton UI</strong>. The prototype here uses <strong>React 18 + Babel (CDN)</strong> — no build step — for rapid UI iteration. See <a href="CONTRIBUTING.md" target="_blank">CONTRIBUTING.md</a> to add components or screens.
+      </div>
+
+      <div class="welcome-proto">
+        <div class="welcome-proto-text">
+          <h3>🖥️ Interactive prototype</h3>
+          <p>30+ screens — home, requests, offers, users, organizations, service types, admin.</p>
+        </div>
+        <a href="ui_kits/requests-and-offers/" target="_blank" class="welcome-proto-btn">Open prototype ↗</a>
+      </div>
+
+      <div>
+        <div class="welcome-section-label">Design tokens — click to explore</div>
+        <div class="welcome-grid" id="welcome-tiles"></div>
+      </div>
+
+    </div>
+
+    <!-- Prototype panel -->
+    <div class="proto-card" id="panel-proto">
+      <div class="proto-card-hero">
+        <h2>🖥️ Requests &amp; Offers prototype</h2>
+        <p>30+ interactive screens covering the full app: home dashboard, requests, offers, users, organizations, service types, and admin. React 18 + Babel, no build step.</p>
+        <a href="ui_kits/requests-and-offers/" target="_blank">Open full prototype ↗</a>
+      </div>
+      <div class="proto-screens">
+        <div class="proto-screen-pill"><span>🏠</span> Home</div>
+        <div class="proto-screen-pill"><span>📝</span> Requests</div>
+        <div class="proto-screen-pill"><span>💡</span> Offers</div>
+        <div class="proto-screen-pill"><span>👥</span> Users</div>
+        <div class="proto-screen-pill"><span>🏢</span> Organizations</div>
+        <div class="proto-screen-pill"><span>🏷️</span> Service Types</div>
+        <div class="proto-screen-pill"><span>✏️</span> Create / Edit flows</div>
+        <div class="proto-screen-pill"><span>⚙️</span> Admin dashboard</div>
+        <div class="proto-screen-pill"><span>💱</span> Mediums of Exchange</div>
+        <div class="proto-screen-pill"><span>🛡️</span> Administrators</div>
+      </div>
+    </div>
+
+    <!-- Preview iframes are injected here by JS -->
+
+  </main>
 </div>
 
-<main class="page">
+<script>
+(function () {
+  const content      = document.getElementById('content');
+  const protoPanel   = document.getElementById('panel-proto');
+  const welcomePanel = document.getElementById('panel-welcome');
+  const sidebar      = document.getElementById('sidebar');
+  const toggle       = document.getElementById('sidebarToggle');
 
-  <!-- Quick start -->
-  <p class="section-label">Quick start</p>
-  <div class="code-block">
-    <span class="comment"># serve the full design system locally</span><br />
-    <span class="cmd">npm run dev</span>  <span class="comment"># → http://localhost:3000</span><br /><br />
-    <span class="comment"># or serve just the prototype (no node_modules needed)</span><br />
-    <span class="cmd">npx serve ui_kits/requests-and-offers --listen 3001</span>
-  </div>
+  // ── Mobile overlay (prevents closing sidebar on content click) ──
+  const overlay = document.createElement('div');
+  overlay.style.cssText = [
+    'display:none;position:fixed;inset:0;z-index:98;',
+    'background:rgba(0,0,0,0.3);'
+  ].join('');
+  document.body.appendChild(overlay);
 
-  <!-- Prototype -->
-  <p class="section-label">Interactive prototype</p>
-  <div class="grid grid-2" style="margin-bottom:48px">
-    <a href="ui_kits/requests-and-offers/" class="card">
-      <div class="card-icon">🖥️</div>
-      <div class="card-title">Requests &amp; Offers — Full prototype</div>
-      <div class="card-desc">30+ screens: home, requests, offers, users, organizations, service types, and admin. Click-through navigation with mock data.</div>
-      <span class="card-tag green">Live prototype</span>
-    </a>
-  </div>
+  function openSidebar() {
+    sidebar.classList.add('open');
+    overlay.style.display = 'block';
+  }
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    overlay.style.display = 'none';
+  }
 
-  <!-- Token previews -->
-  <p class="section-label">Design tokens</p>
-  <div class="grid grid-3">
-    <a href="preview/colors-primary.html" class="card">
-      <div class="card-icon">🟣</div>
-      <div class="card-title">Primary palette</div>
-      <div class="card-desc">Royal violet — nav, buttons, headings, links.</div>
-      <span class="card-tag">Colors</span>
-    </a>
-    <a href="preview/colors-accents.html" class="card">
-      <div class="card-icon">🟡</div>
-      <div class="card-title">Accent palettes</div>
-      <div class="card-desc">Sun gold, sky cyan, success, warning, error.</div>
-      <span class="card-tag">Colors</span>
-    </a>
-    <a href="preview/colors-semantic.html" class="card">
-      <div class="card-icon">🎨</div>
-      <div class="card-title">Semantic colors</div>
-      <div class="card-desc">Surface backgrounds, foreground ink, border.</div>
-      <span class="card-tag">Colors</span>
-    </a>
-    <a href="preview/type-display.html" class="card">
-      <div class="card-icon">Aa</div>
-      <div class="card-title">Display type</div>
-      <div class="card-desc">Caveat (display), Inter headings, scale.</div>
-      <span class="card-tag">Typography</span>
-    </a>
-    <a href="preview/type-body.html" class="card">
-      <div class="card-icon">¶</div>
-      <div class="card-title">Body type</div>
-      <div class="card-desc">Inter body, small, muted, link, code styles.</div>
-      <span class="card-tag">Typography</span>
-    </a>
-    <a href="preview/spacing.html" class="card">
-      <div class="card-icon">↔️</div>
-      <div class="card-title">Spacing scale</div>
-      <div class="card-desc">4–64px spacing tokens matching Tailwind.</div>
-      <span class="card-tag gold">Spacing</span>
-    </a>
-    <a href="preview/radii-shadows.html" class="card">
-      <div class="card-icon">⬜</div>
-      <div class="card-title">Radii &amp; shadows</div>
-      <div class="card-desc">Pill (9999px) buttons, 8px cards, shadow scale.</div>
-      <span class="card-tag gold">Radii</span>
-    </a>
-    <a href="preview/iconography.html" class="card">
-      <div class="card-icon">🏷️</div>
-      <div class="card-title">Iconography</div>
-      <div class="card-desc">Emoji icon vocabulary used across the app.</div>
-      <span class="card-tag">Icons</span>
-    </a>
-    <a href="preview/logos.html" class="card">
-      <div class="card-icon">🌟</div>
-      <div class="card-title">Logos &amp; brand</div>
-      <div class="card-desc">CIC logo, wordmark, sun icon, default avatar.</div>
-      <span class="card-tag">Brand</span>
-    </a>
-  </div>
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+  });
+  overlay.addEventListener('click', closeSidebar);
 
-  <!-- Component previews -->
-  <p class="section-label">Components</p>
-  <div class="grid grid-3">
-    <a href="preview/components-buttons.html" class="card">
-      <div class="card-icon">🔘</div>
-      <div class="card-title">Buttons</div>
-      <div class="card-desc">Primary, secondary, warning, tertiary, ghost, soft variants.</div>
-      <span class="card-tag green">Components</span>
-    </a>
-    <a href="preview/components-badges.html" class="card">
-      <div class="card-icon">🏷️</div>
-      <div class="card-title">Badges &amp; chips</div>
-      <div class="card-desc">Status pills, service-type chips, connection dots.</div>
-      <span class="card-tag green">Components</span>
-    </a>
-    <a href="preview/components-cards.html" class="card">
-      <div class="card-icon">🃏</div>
-      <div class="card-title">Cards</div>
-      <div class="card-desc">Action cards and listing cards with hover states.</div>
-      <span class="card-tag green">Components</span>
-    </a>
-    <a href="preview/components-inputs.html" class="card">
-      <div class="card-icon">✏️</div>
-      <div class="card-title">Form inputs</div>
-      <div class="card-desc">Text input, textarea, select — Skeleton-matched styles.</div>
-      <span class="card-tag green">Components</span>
-    </a>
-    <a href="preview/components-nav.html" class="card">
-      <div class="card-icon">🧭</div>
-      <div class="card-title">Navigation</div>
-      <div class="card-desc">Top nav bar, mobile drawer, admin badge.</div>
-      <span class="card-tag green">Components</span>
-    </a>
-  </div>
+  // ── iframe cache: src → { wrap, iframe } ──
+  const cache = {};
 
-  <!-- Source files -->
-  <p class="section-label">Source files</p>
-  <div class="grid grid-2">
-    <a href="colors_and_type.css" class="card">
-      <div class="card-icon">🎨</div>
-      <div class="card-title">colors_and_type.css</div>
-      <div class="card-desc">All color tokens (RGB triplets), semantic foreground/background, typography scale, spacing, shadows, and semantic element classes.</div>
-      <span class="card-tag">CSS</span>
-    </a>
-    <a href="README.md" class="card">
-      <div class="card-icon">📖</div>
-      <div class="card-title">Design system README</div>
-      <div class="card-desc">Full reference: visual foundations, content voice, iconography, component recipes, and caveats.</div>
-      <span class="card-tag">Docs</span>
-    </a>
-  </div>
+  function autoHeight(iframe) {
+    try {
+      const h = iframe.contentDocument.documentElement.scrollHeight;
+      if (h > 0) iframe.style.height = (h + 4) + 'px';
+    } catch (e) {
+      iframe.style.height = '480px';
+    }
+  }
 
-</main>
+  // ── All static panels keyed by data-panel value ──
+  const staticPanels = {
+    welcome: welcomePanel,
+    proto:   protoPanel,
+  };
 
-<footer class="footer">
-  <p>hAppenings Community CIC · MIT License · <a href="CONTRIBUTING.md">Contributing</a> · <a href="https://happenings.community/">happenings.community</a></p>
-</footer>
+  function showPanel(btn) {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Hide all panels
+    Object.values(staticPanels).forEach(p => p.classList.remove('visible'));
+    Object.values(cache).forEach(c => c.wrap.classList.remove('visible'));
+
+    const panel = btn.dataset.panel;
+    const src   = btn.dataset.src;
+
+    // Static panels (welcome, proto)
+    if (panel && staticPanels[panel]) {
+      staticPanels[panel].classList.add('visible');
+      closeSidebar();
+      return;
+    }
+
+    if (!src) return;
+
+    // Cached iframe: just show it
+    if (cache[src]) {
+      cache[src].wrap.classList.add('visible');
+      autoHeight(cache[src].iframe);
+      closeSidebar();
+      return;
+    }
+
+    // First visit: create iframe (no loading="lazy" — already on-demand)
+    const wrap = document.createElement('div');
+    wrap.className = 'preview-frame-wrap visible';
+
+    const loader = document.createElement('div');
+    loader.className = 'preview-loading';
+    loader.innerHTML = '<div class="spinner"></div> Loading…';
+    wrap.appendChild(loader);
+
+    const iframe = document.createElement('iframe');
+    iframe.src = src;
+    iframe.title = btn.textContent.trim();
+    iframe.style.cssText = 'width:100%;border:none;display:none;';
+
+    iframe.onload = () => {
+      loader.remove();
+      iframe.style.display = 'block';
+      autoHeight(iframe);
+    };
+
+    wrap.appendChild(iframe);
+    content.appendChild(wrap);
+    cache[src] = { wrap, iframe };
+
+    closeSidebar();
+  }
+
+  // ── Wire up all nav buttons ──
+  document.querySelectorAll('[data-src], [data-panel]').forEach(btn => {
+    btn.addEventListener('click', () => showPanel(btn));
+  });
+
+  // ── Welcome tile click-throughs ──
+  const TILES = [
+    { ic:'🟣', name:'Primary colors',   sub:'Royal violet scale',        src:'preview/colors-primary.html' },
+    { ic:'🎨', name:'Accent colors',    sub:'Gold, cyan, semantic',       src:'preview/colors-accents.html' },
+    { ic:'✍️', name:'Typography',        sub:'Display + body scales',      src:'preview/type-display.html' },
+    { ic:'↔️', name:'Spacing',          sub:'4–64px token scale',         src:'preview/spacing.html' },
+    { ic:'⬜', name:'Radii & Shadows',  sub:'Pills, cards, elevation',    src:'preview/radii-shadows.html' },
+    { ic:'🔘', name:'Buttons',          sub:'All variants + states',      src:'preview/components-buttons.html' },
+    { ic:'🏷️', name:'Badges',          sub:'Status chips & pills',       src:'preview/components-badges.html' },
+    { ic:'🃏', name:'Cards',            sub:'Action & listing cards',     src:'preview/components-cards.html' },
+    { ic:'✏️', name:'Inputs',           sub:'Text, textarea, select',     src:'preview/components-inputs.html' },
+    { ic:'🌟', name:'Logos & Brand',    sub:'Logos, icon, avatar',        src:'preview/logos.html' },
+  ];
+
+  const tilesGrid = document.getElementById('welcome-tiles');
+  TILES.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'welcome-tile';
+    btn.innerHTML = `
+      <span class="welcome-tile-ic">${t.ic}</span>
+      <span class="welcome-tile-body">
+        <span class="welcome-tile-name">${t.name}</span>
+        <span class="welcome-tile-sub">${t.sub}</span>
+      </span>`;
+    btn.addEventListener('click', () => {
+      // Find the matching sidebar nav item and delegate to showPanel
+      const match = document.querySelector(`[data-src="${t.src}"]`);
+      if (match) showPanel(match);
+    });
+    tilesGrid.appendChild(btn);
+  });
+
+  // ── Default view: welcome ──
+  // (welcome panel already has .visible in HTML — nothing to do)
+})();
+</script>
 
 </body>
 </html>

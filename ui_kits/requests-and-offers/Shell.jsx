@@ -86,6 +86,14 @@ function ScreenMap({ currentRoute, onNavigate, onClose }) {
 function NavBar({ route, onNavigate, onMapOpen }) {
   const [open, setOpen] = useStateShell(null);
 
+  // Close on any outside click
+  useEffectShell(() => {
+    if (!open) return;
+    const close = () => setOpen(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [open]);
+
   const dropdownItems = {
     activity: [
       { key: 'user-profile', payload: 'u5', label: 'My Profile',   ic: '👤' },
@@ -103,12 +111,15 @@ function NavBar({ route, onNavigate, onMapOpen }) {
   };
 
   const item = (key, label) => (
-    <div className="nav-menu" onMouseLeave={() => setOpen(null)}>
-      <span className={`nav-link ${open===key?'is-open':''}`} onMouseEnter={() => setOpen(key)} onClick={() => setOpen(open===key?null:key)}>
+    <div className="nav-menu">
+      <span
+        className={`nav-link ${open===key?'is-open':''}`}
+        onClick={(e) => { e.stopPropagation(); setOpen(open===key ? null : key); }}
+      >
         {label} <span aria-hidden style={{opacity:.7, fontSize:10}}>▾</span>
       </span>
       {open===key && (
-        <div className="nav-pop">
+        <div className="nav-pop" onClick={e => e.stopPropagation()}>
           {dropdownItems[key].map(d => (
             <a key={d.key+d.label} className="nav-pop__item" onClick={() => { onNavigate(d.key, d.payload); setOpen(null); }}>
               <span className="nav-pop__ic">{d.ic}</span>{d.label}
@@ -196,8 +207,9 @@ const shellStyles = `
 .nav-link:hover, .nav-link.is-open { background: rgba(255,255,255,.12); }
 
 .nav-pop {
-  position: absolute; top: calc(100% + 8px); left: 0;
-  background: #fff; min-width: 210px;
+  position: absolute; top: 100%; left: 0;
+  margin-top: 6px;
+  background: #fff; min-width: 180px;
   border: 1px solid rgb(var(--border-1));
   border-radius: 12px; box-shadow: var(--shadow-lg);
   padding: 6px; z-index: 50;
