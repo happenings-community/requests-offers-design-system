@@ -6,6 +6,7 @@
 <title>hAppenings — Design System</title>
 <link rel="icon" href="assets/icon.png" />
 <link rel="stylesheet" href="colors_and_type.css" />
+<script src="https://cdn.jsdelivr.net/npm/marked@13/marked.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -375,6 +376,114 @@
     margin-bottom: 4px;
   }
 
+  /* ── README panel ── */
+  .readme-panel {
+    display: none;
+    padding: 40px 48px 64px;
+    max-width: 860px;
+  }
+  .readme-panel.visible { display: block; }
+
+  .readme-content { font-size: 15px; line-height: 1.7; color: rgb(var(--fg-1)); }
+
+  .readme-content h1 {
+    font-size: 28px; font-weight: 700; letter-spacing: -0.02em;
+    color: rgb(var(--color-primary-700));
+    margin: 0 0 20px; padding-bottom: 12px;
+    border-bottom: 2px solid rgb(var(--border-1));
+  }
+  .readme-content h2 {
+    font-size: 20px; font-weight: 700;
+    color: rgb(var(--fg-1));
+    margin: 36px 0 12px; padding-bottom: 8px;
+    border-bottom: 1px solid rgb(var(--border-1));
+  }
+  .readme-content h3 {
+    font-size: 16px; font-weight: 600;
+    color: rgb(var(--fg-1));
+    margin: 24px 0 8px;
+  }
+  .readme-content h4 {
+    font-size: 14px; font-weight: 600;
+    color: rgb(var(--fg-2));
+    margin: 20px 0 6px;
+  }
+  .readme-content p { margin: 0 0 14px; }
+  .readme-content p:last-child { margin-bottom: 0; }
+
+  .readme-content a { color: rgb(var(--color-primary-600)); text-underline-offset: 2px; }
+  .readme-content a:hover { color: rgb(var(--color-primary-500)); }
+
+  .readme-content ul, .readme-content ol {
+    margin: 0 0 14px 24px;
+  }
+  .readme-content li { margin-bottom: 4px; }
+
+  .readme-content blockquote {
+    margin: 16px 0;
+    padding: 10px 16px;
+    border-left: 3px solid rgb(var(--color-primary-400));
+    background: rgb(var(--color-primary-50));
+    border-radius: 0 6px 6px 0;
+    color: rgb(var(--fg-2));
+    font-size: 14px;
+  }
+  .readme-content blockquote p { margin: 0; }
+
+  .readme-content code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    background: rgb(var(--color-surface-100));
+    color: rgb(var(--color-surface-900));
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .readme-content pre {
+    background: rgb(var(--color-surface-800));
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    margin: 0 0 16px;
+  }
+  .readme-content pre code {
+    background: none;
+    color: rgb(var(--color-surface-100));
+    padding: 0;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .readme-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 16px;
+    font-size: 14px;
+  }
+  .readme-content th {
+    text-align: left;
+    padding: 8px 12px;
+    background: rgb(var(--bg-muted));
+    font-weight: 600;
+    border-bottom: 2px solid rgb(var(--border-1));
+  }
+  .readme-content td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgb(var(--border-1));
+    vertical-align: top;
+  }
+  .readme-content tr:last-child td { border-bottom: none; }
+
+  .readme-content hr {
+    border: none;
+    border-top: 1px solid rgb(var(--border-1));
+    margin: 32px 0;
+  }
+
+  .readme-loading {
+    display: flex; align-items: center; gap: 8px;
+    padding: 40px 48px; color: rgb(var(--fg-3)); font-size: 14px;
+  }
+
   /* ── Mobile toggle ── */
   .sidebar-toggle {
     display: none;
@@ -508,17 +617,15 @@
       <div class="nav-divider"></div>
 
       <div class="nav-group">
-        <div class="nav-group-label">Source</div>
+        <div class="nav-group-label">Docs</div>
+        <button class="nav-item" data-panel="readme" data-md="README.md">
+          <span class="nav-item-ic">📖</span> README
+        </button>
+        <button class="nav-item" data-panel="contributing" data-md="CONTRIBUTING.md">
+          <span class="nav-item-ic">🤝</span> Contributing
+        </button>
         <a class="nav-item" href="colors_and_type.css" target="_blank">
           <span class="nav-item-ic">🎨</span> colors_and_type.css
-          <span class="nav-external-ic">↗</span>
-        </a>
-        <a class="nav-item" href="README.md" target="_blank">
-          <span class="nav-item-ic">📖</span> README
-          <span class="nav-external-ic">↗</span>
-        </a>
-        <a class="nav-item" href="CONTRIBUTING.md" target="_blank">
-          <span class="nav-item-ic">🤝</span> Contributing
           <span class="nav-external-ic">↗</span>
         </a>
       </div>
@@ -541,7 +648,7 @@
       </div>
 
       <div class="welcome-desc">
-        This is the community playground for hAppenings Community CIC. The production app is built on <strong>SvelteKit + TailwindCSS + Skeleton UI</strong>. The prototype here uses <strong>React 18 + Babel (CDN)</strong> — no build step — for rapid UI iteration. See <a href="CONTRIBUTING.md" target="_blank">CONTRIBUTING.md</a> to add components or screens.
+        This is the community playground for hAppenings Community CIC. The production app is built on <strong>SvelteKit + TailwindCSS + Skeleton UI</strong>. The prototype here uses <strong>React 18 + Babel (CDN)</strong> — no build step — for rapid UI iteration. See the <strong>Contributing</strong> doc (sidebar) to add components or screens.
       </div>
 
       <div class="welcome-proto">
@@ -579,6 +686,10 @@
         <div class="proto-screen-pill"><span>🛡️</span> Administrators</div>
       </div>
     </div>
+
+    <!-- Markdown doc panels (populated by JS) -->
+    <div class="readme-panel" id="panel-readme"><div class="readme-loading"><div class="spinner"></div> Loading…</div></div>
+    <div class="readme-panel" id="panel-contributing"><div class="readme-loading"><div class="spinner"></div> Loading…</div></div>
 
     <!-- Preview iframes are injected here by JS -->
 
@@ -628,11 +739,31 @@
     }
   }
 
+  const readmePanel       = document.getElementById('panel-readme');
+  const contributingPanel = document.getElementById('panel-contributing');
+
   // ── All static panels keyed by data-panel value ──
   const staticPanels = {
-    welcome: welcomePanel,
-    proto:   protoPanel,
+    welcome:      welcomePanel,
+    proto:        protoPanel,
+    readme:       readmePanel,
+    contributing: contributingPanel,
   };
+
+  // Markdown panels: fetch + render on first show
+  const mdLoaded = {};
+  async function loadMarkdown(panelEl, mdFile) {
+    if (mdLoaded[mdFile]) return;
+    mdLoaded[mdFile] = true;
+    try {
+      const res  = await fetch(mdFile);
+      const text = await res.text();
+      const html = marked.parse(text);
+      panelEl.innerHTML = `<div class="readme-content">${html}</div>`;
+    } catch (e) {
+      panelEl.innerHTML = `<div class="readme-loading">Could not load ${mdFile}.</div>`;
+    }
+  }
 
   function showPanel(btn) {
     document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
@@ -645,9 +776,12 @@
     const panel = btn.dataset.panel;
     const src   = btn.dataset.src;
 
-    // Static panels (welcome, proto)
+    // Static panels (welcome, proto, readme, contributing)
     if (panel && staticPanels[panel]) {
       staticPanels[panel].classList.add('visible');
+      // Lazy-load markdown on first open
+      const mdFile = btn.dataset.md;
+      if (mdFile) loadMarkdown(staticPanels[panel], mdFile);
       closeSidebar();
       return;
     }
