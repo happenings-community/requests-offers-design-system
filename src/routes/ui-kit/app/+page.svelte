@@ -12,11 +12,19 @@
     { id: 'st7', name: 'Music / Audio',  technical: false },
     { id: 'st8', name: 'Data Analysis',  technical: true  },
   ];
-  const MEDIUMS = ['Time Credits', 'Skill Exchange', 'EUR', 'Local Currency'];
-  const TZS = ['UTC', 'Europe/Paris', 'America/New_York', 'Asia/Tokyo', 'Pacific/Auckland'];
+  type Medium = { code: string; name: string; type: 'base' | 'currency'; status: 'pending' | 'approved' };
+  const MEDIUMS: Medium[] = [
+    { code:'TIME',  name:'Time Credits',   type:'base',     status:'approved' },
+    { code:'SKILL', name:'Skill Exchange', type:'base',     status:'approved' },
+    { code:'EUR',   name:'Euro',           type:'currency', status:'approved' },
+    { code:'LOCAL', name:'Local Currency', type:'base',     status:'approved' },
+    { code:'USD',   name:'US Dollar',      type:'currency', status:'pending'  },
+  ];
+  const MEDIUM_NAMES = MEDIUMS.map(m => m.name);
+  const TZS = ['UTC', 'Europe/Paris', 'Europe/Madrid', 'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Asia/Tokyo', 'Asia/Singapore', 'Australia/Sydney', 'Pacific/Auckland'];
 
   type User = { id: string; name: string; nickname: string; type: string; location: string; bio: string; status: string; email?: string; timeZone?: string };
-  type Org  = { id: string; name: string; email: string; location: string; description: string; members: number };
+  type Org  = { id: string; name: string; email: string; location: string; description: string; members: number; status: 'active' | 'pending' | 'suspended' };
   type Item = { id: string; title: string; description: string; serviceTypes: string[]; mediums: string[]; interaction: string; timePreference: string; timeZone: string; status: string; creator: User; links: string[]; org: Org | null; timeEstimate?: number };
 
   const USERS: User[] = [
@@ -29,9 +37,11 @@
   const ME = USERS[4];
 
   const ORGS: Org[] = [
-    { id:'o1', name:'hAppenings CIC', email:'hello@happenings.org', location:'Lyon, FR',      description:'Community Interest Company running mutual aid programs across Europe.', members:12 },
-    { id:'o2', name:'Open Tech Coop', email:'info@opentech.coop',   location:'Barcelona, ES', description:'Worker cooperative developing open-source tools for cooperatives.', members:7 },
+    { id:'o1', name:'hAppenings CIC', email:'hello@happenings.org', location:'Lyon, FR',      description:'Community Interest Company running mutual aid programs across Europe.', members:12, status:'active' },
+    { id:'o2', name:'Open Tech Coop', email:'info@opentech.coop',   location:'Barcelona, ES', description:'Worker cooperative developing open-source tools for cooperatives.',       members:7,  status:'active' },
   ];
+
+  const ADMINS = USERS.slice(0, 3);
 
   const REQUESTS: Item[] = [
     { id:'r1', title:'Looking for a Holochain mentor',            description:'I am building my first hApp and need guidance on zome architecture, entry validation, and testing. Happy to exchange language tutoring.',          serviceTypes:['Mentoring','Software Dev'], mediums:['Skill Exchange'],           interaction:'Virtual',   timePreference:'Afternoon',     timeZone:'Europe/Paris', status:'active',   creator:USERS[1], links:[],                   org:null,     timeEstimate:3 },
@@ -62,6 +72,24 @@
     contactModal = { user, org, listingType, listingTitle };
   }
   function closeContactModal() { contactModal = null; }
+
+  // ── Markdown renderer ──────────────────────────────────────────────────────
+  function md(text: string): string {
+    return text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      .replace(/(<li>[\s\S]+?<\/li>)/g, '<ul>$1</ul>')
+      .replace(/\n/g, '<br>');
+  }
+
+  // ── Confirm modal ──────────────────────────────────────────────────────────
+  type ConfirmTarget = { message: string; onConfirm: () => void };
+  let confirmModal = $state<ConfirmTarget | null>(null);
+  function openConfirm(message: string, onConfirm: () => void) { confirmModal = { message, onConfirm }; }
+  function closeConfirm() { confirmModal = null; }
+  function executeConfirm() { confirmModal?.onConfirm(); confirmModal = null; }
 
   async function copyToClipboard(text: string) {
     try { await navigator.clipboard.writeText(text); } catch { /* silent */ }
@@ -252,7 +280,10 @@
               {#each cat.users as u}
                 <tr>
                   <td><div class="av av--sm">{u.name[0]}</div></td>
-                  <td class="td-name">{u.name}</td>
+                  <td class="td-name">
+                    {u.name}
+                    {#if u.status === 'pending'}<ds-chip tone="warning" style="margin-left:6px;font-size:10px">Pending</ds-chip>{/if}
+                  </td>
                   <td><span class="badge-type">{u.type}</span></td>
                   <td class="td-muted">{u.location}</td>
                   <td><button class="btn-ghost" onclick={() => navigate('user-profile', u.id)}>View</button></td>
@@ -312,7 +343,90 @@
               <td><ds-chip tone={st.technical?'tertiary':'surface'}>{st.technical?'Technical':'Non-Technical'}</ds-chip></td>
               <td>
                 <button class="btn-ghost">Edit</button>
-                <button class="btn-ghost" style="color:rgb(var(--color-error-600))">Delete</button>
+                <button class="btn-ghost" style="color:rgb(var(--color-error-600))"
+                  onclick={() => openConfirm(`Delete "${st.name}"? This cannot be undone.`, () => {})}>Delete</button>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+
+    <!-- Admin Mediums of Exchange -->
+    {:else if adminSection === 'mediums'}
+      <div class="admin-page-header">
+        <h1 class="admin-page-title">Mediums of Exchange</h1>
+        <button class="btn-ds btn-ds--primary btn-ds--sm">+ Create Medium</button>
+      </div>
+      <table class="admin-table">
+        <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          {#each MEDIUMS as m}
+            <tr>
+              <td class="td-name">{m.code}</td>
+              <td>{m.name}</td>
+              <td><ds-chip tone={m.type === 'base' ? 'surface' : 'tertiary'}>{m.type === 'base' ? '📂 Base' : '💰 Currency'}</ds-chip></td>
+              <td><ds-chip tone={m.status === 'approved' ? 'success' : 'warning'}>{m.status}</ds-chip></td>
+              <td>
+                {#if m.status === 'pending'}
+                  <button class="btn-ghost btn-ghost--sm">Approve</button>
+                  <button class="btn-ghost btn-ghost--sm" style="color:rgb(var(--color-error-600))">Reject</button>
+                {/if}
+                <button class="btn-ghost btn-ghost--sm">Edit</button>
+                <button class="btn-ghost btn-ghost--sm" style="color:rgb(var(--color-error-600))"
+                  onclick={() => openConfirm(`Delete medium "${m.name}"?`, () => {})}>Delete</button>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+
+    <!-- Admin Organizations -->
+    {:else if adminSection === 'organizations'}
+      <div class="admin-page-header">
+        <h1 class="admin-page-title">Organizations Management</h1>
+        <button class="btn-ghost">Status History</button>
+      </div>
+      <table class="admin-table">
+        <thead><tr><th></th><th>Name</th><th>Location</th><th>Members</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          {#each ORGS as o}
+            <tr>
+              <td><div class="org-logo" style="width:32px;height:32px;font-size:14px;border-radius:8px">{o.name[0]}</div></td>
+              <td class="td-name">{o.name}</td>
+              <td class="td-muted">{o.location}</td>
+              <td class="td-muted">{o.members}</td>
+              <td><ds-chip tone={o.status === 'active' ? 'success' : o.status === 'pending' ? 'warning' : 'error'}>{o.status}</ds-chip></td>
+              <td>
+                <button class="btn-ghost btn-ghost--sm" onclick={() => navigate('org-detail', o.id)}>View</button>
+                <button class="btn-ghost btn-ghost--sm" onclick={() => navigate('org-edit', o.id)}>Edit</button>
+                <button class="btn-ghost btn-ghost--sm" style="color:rgb(var(--color-error-600))"
+                  onclick={() => openConfirm(`Suspend "${o.name}"?`, () => {})}>Suspend</button>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+
+    <!-- Admin Administrators -->
+    {:else if adminSection === 'administrators'}
+      <div class="admin-page-header">
+        <h1 class="admin-page-title">Administrators</h1>
+        <button class="btn-ds btn-ds--primary btn-ds--sm">+ Add Administrator</button>
+      </div>
+      <p class="ds-small" style="margin-bottom:16px;color:rgba(255,255,255,.5)">{ADMINS.length} network administrator{ADMINS.length !== 1 ? 's' : ''}</p>
+      <table class="admin-table">
+        <thead><tr><th></th><th>Name</th><th>Type</th><th>Location</th><th>Actions</th></tr></thead>
+        <tbody>
+          {#each ADMINS as u}
+            <tr>
+              <td><div class="av av--sm">{u.name[0]}</div></td>
+              <td class="td-name">{u.name}</td>
+              <td><span class="badge-type">{u.type}</span></td>
+              <td class="td-muted">{u.location}</td>
+              <td>
+                <button class="btn-ghost btn-ghost--sm" onclick={() => navigate('user-profile', u.id)}>View</button>
+                <button class="btn-ghost btn-ghost--sm" style="color:rgb(var(--color-error-600))"
+                  onclick={() => openConfirm(`Remove ${u.name} as administrator?`, () => {})}>Remove</button>
               </td>
             </tr>
           {/each}
@@ -471,7 +585,7 @@
               {#if req.status==='archived'}<ds-chip tone="warning">Archived</ds-chip>{/if}
             </div>
           </div>
-          <p class="ds-p">{req.description}</p>
+          <p class="ds-p">{@html md(req.description)}</p>
         </div>
         <div class="detail-sections">
           <div class="detail-section">
@@ -534,7 +648,7 @@
 
         <div class="form-card-section"><label class="field-label">Mediums of Exchange</label>
           <div class="multi-chips">
-            {#each MEDIUMS as m}
+            {#each MEDIUM_NAMES as m}
               <button type="button" class="sel-chip {rMed.includes(m)?'sel-chip--on':''}" onclick={() => rMed = toggleArr(rMed, m)}>{m}</button>
             {/each}
           </div>
@@ -663,7 +777,7 @@
               {#if offer.status==='archived'}<ds-chip tone="warning">Archived</ds-chip>{/if}
             </div>
           </div>
-          <p class="ds-p">{offer.description}</p>
+          <p class="ds-p">{@html md(offer.description)}</p>
         </div>
         <div class="detail-sections">
           <div class="detail-section">
@@ -713,7 +827,7 @@
           </div></div>
         <div class="form-card-section"><label class="field-label">Mediums of Exchange</label>
           <div class="multi-chips">
-            {#each MEDIUMS as m}
+            {#each MEDIUM_NAMES as m}
               <button type="button" class="sel-chip {oMed.includes(m)?'sel-chip--on':''}" onclick={() => oMed = toggleArr(oMed, m)}>{m}</button>
             {/each}
           </div>
@@ -828,9 +942,13 @@
           <div class="profile-meta">
             <ds-chip tone="surface">{u.type}</ds-chip>
             <span class="ds-small">📍 {u.location}</span>
-            <span class="ds-small" style="color:rgb(var(--color-success-600))">● Accepted</span>
+            {#if u.status === 'pending'}
+              <ds-chip tone="warning">Pending Review</ds-chip>
+            {:else}
+              <span class="ds-small" style="color:rgb(var(--color-success-600))">● Accepted</span>
+            {/if}
           </div>
-          <p class="ds-p">{u.bio}</p>
+          <p class="ds-p">{@html md(u.bio)}</p>
         </div>
       </div>
       <section style="margin-bottom:24px">
@@ -936,7 +1054,7 @@
           <span class="ds-small">📍 {org.location} · ✉️ {org.email}</span>
         </div>
       </div>
-      <p class="ds-p" style="margin-bottom:24px">{org.description}</p>
+      <p class="ds-p" style="margin-bottom:24px">{@html md(org.description)}</p>
       <div class="tab-group" style="margin-bottom:16px">
         {#each ['members','coordinators','requests','offers'] as t}
           <button class="tab {orgTab===t?'tab--primary':''}" onclick={() => orgTab = t as typeof orgTab}>
@@ -1245,6 +1363,23 @@
     </div>
   </div>
 {/if}
+
+<!-- ── CONFIRM MODAL ── -->
+{#if confirmModal}
+  {@const target = confirmModal}
+  <div class="modal-backdrop" onclick={closeConfirm} role="button" tabindex="-1"
+       onkeydown={(e) => e.key === 'Escape' && closeConfirm()}>
+    <div class="modal-panel modal-panel--compact" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+      <button class="modal-close" onclick={closeConfirm} aria-label="Close">✕</button>
+      <header class="modal-header"><h3 class="ds-h3">⚠️ Confirm Action</h3></header>
+      <p class="ds-p" style="text-align:center;margin:0 0 24px">{target.message}</p>
+      <footer class="modal-footer" style="display:flex;gap:12px;justify-content:center">
+        <button class="btn-ghost" onclick={closeConfirm}>Cancel</button>
+        <button class="btn-ds" style="background:rgb(var(--color-error-600));color:#fff" onclick={executeConfirm}>Confirm</button>
+      </footer>
+    </div>
+  </div>
+{/if}
 </div>
 
 <style>
@@ -1477,6 +1612,7 @@
     position: relative; padding: 32px;
     animation: modal-in 150ms ease;
   }
+  .modal-panel--compact { max-width: 360px; padding: 28px; }
   @keyframes modal-in { from { opacity:0; transform:scale(.96); } to { opacity:1; transform:scale(1); } }
   .modal-close {
     position: absolute; top: 16px; right: 16px;
