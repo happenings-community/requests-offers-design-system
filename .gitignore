@@ -7,3 +7,6 @@ Plans/
 web-capture*.json
 .cache/
 dist/
+build/
+.svelte-kit/
+static/registry/bundle.js
