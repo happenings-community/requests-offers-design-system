@@ -2,6 +2,7 @@ node_modules/
 .DS_Store
 scraps/
 .local/
+Plans/
 *.napkin
 web-capture*.json
 .cache/
