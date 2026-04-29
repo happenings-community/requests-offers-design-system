@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Buttons</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; padding: 18px; background: rgb(var(--bg-app)); font-family: var(--font-base); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px;}
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    border-radius: 9999px; padding: 8px 18px;
+    font-weight: 600; font-size: 14px; line-height: 20px;
+    border: 1px solid transparent; cursor: pointer;
+    transition: all 150ms ease;
+    box-shadow: 0 1px 2px rgb(0 0 0 / .05);
+  }
+  .btn-primary { background: rgb(var(--color-primary-500)); color: #fff;}
+  .btn-primary:hover { background: rgb(var(--color-primary-600)); box-shadow: var(--shadow-md);}
+  .btn-secondary { background: rgb(var(--color-secondary-500)); color: #111;}
+  .btn-secondary:hover { background: rgb(var(--color-tertiary-500)); color: #111;}
+  .btn-warning { background: rgb(var(--color-warning-500)); color: #111;}
+  .btn-warning:hover { background: rgb(var(--color-error-500)); color: #fff;}
+  .btn-tertiary { background: rgb(var(--color-tertiary-500)); color: #111;}
+  .btn-ghost { background: transparent; color: rgb(var(--color-primary-700)); border-color: rgb(var(--color-primary-300));}
+  .btn-ghost:hover { background: rgb(var(--color-primary-50));}
+  .btn-soft { background: rgb(var(--color-surface-100)); color: rgb(var(--color-surface-900));}
+  .btn-sm { padding: 6px 12px; font-size: 13px;}
+  .btn[disabled] { opacity: .5; cursor: not-allowed;}
+</style>
+</head>
+<body>
+  <div class="row">
+    <button class="btn btn-primary">📝 Create Request</button>
+    <button class="btn btn-secondary">📝 Requests</button>
+    <button class="btn btn-warning">💡 Offers</button>
+    <button class="btn btn-tertiary">👥 Community</button>
+  </div>
+  <div class="row">
+    <button class="btn btn-ghost btn-sm">All</button>
+    <button class="btn btn-ghost btn-sm">My</button>
+    <button class="btn btn-ghost btn-sm">Organization</button>
+    <button class="btn btn-soft btn-sm" disabled>Profile Approval Required</button>
+  </div>
+</body>
+</html>

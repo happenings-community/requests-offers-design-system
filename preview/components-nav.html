@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Nav bar</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 700px; overflow: hidden; }
+  body {
+    background: rgb(var(--bg-muted));
+    font-family: var(--font-base);
+  }
+  nav {
+    width: 700px;
+    height: 80px;
+    background: rgb(var(--color-primary-500));
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / .18);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 10px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+  .logo img { width: 40px; height: 40px; display: block; }
+  .logo-text {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .spacer { flex: 1; }
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border-radius: 9999px;
+    padding: 7px 13px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgb(0 0 0 / .12);
+  }
+  .btn-sec  { background: rgb(var(--color-secondary-500)); color: #111; }
+  .btn-warn { background: rgb(var(--color-warning-500));   color: #111; }
+  .nav-link {
+    color: rgba(255,255,255,.92);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    padding: 4px 0;
+  }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid rgba(255,255,255,.28);
+    background: rgba(255,255,255,.13);
+    border-radius: 8px;
+    padding: 5px 9px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+  <nav>
+    <a class="logo">
+      <img src="../assets/hAppeningsCIClogo.png" alt="hAppenings logo" />
+      <span class="logo-text">Requests &amp; Offers</span>
+    </a>
+    <div class="spacer"></div>
+    <div class="nav-right">
+      <button class="btn btn-sec">📝 Requests</button>
+      <button class="btn btn-warn">💡 Offers</button>
+      <span class="nav-link">My Activity ▾</span>
+      <span class="nav-link">Community ▾</span>
+      <span class="status">🟢 Connected</span>
+    </div>
+  </nav>
+</body>
+</html>

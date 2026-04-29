@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Requests &amp; Offers — Full UI Kit</title>
+<link rel="icon" href="../../assets/icon.png" />
+<link rel="stylesheet" href="../../colors_and_type.css" />
+<style>
+  html, body { margin: 0; padding: 0; }
+  #app { font-family: var(--font-base); color: rgb(var(--fg-1)); }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<!-- Components -->
+<script type="text/babel" src="Buttons.jsx"></script>
+<script type="text/babel" src="Badges.jsx"></script>
+<script type="text/babel" src="Inputs.jsx"></script>
+<script type="text/babel" src="Cards.jsx"></script>
+<!-- Mock data first -->
+<script type="text/babel" src="screens/MockData.jsx"></script>
+<script type="text/babel" src="screens/ModalComponents.jsx"></script>
+<!-- Screens — AdminScreens before MiscScreens so AdminDashboard is available -->
+<script type="text/babel" src="screens/Screens.jsx"></script>
+<script type="text/babel" src="screens/OfferScreens.jsx"></script>
+<script type="text/babel" src="screens/UserScreens.jsx"></script>
+<script type="text/babel" src="screens/OrgScreens.jsx"></script>
+<script type="text/babel" src="screens/EditScreens.jsx"></script>
+<script type="text/babel" src="screens/AdminScreens.jsx"></script>
+<script type="text/babel" src="screens/ServiceTypeDetail.jsx"></script>
+<script type="text/babel" src="screens/MiscScreens.jsx"></script>
+<!-- Shell last (depends on all above) -->
+<script type="text/babel" src="Shell.jsx"></script>
+</head>
+<body>
+<div id="app"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const ADMIN_ROUTES = new Set(['admin','admin-mediums','admin-service-types','admin-orgs','admin-requests','admin-offers','admin-administrators']);
+
+function App() {
+  const [route, setRoute] = useState({ name: 'home', payload: null });
+  const navigate = (name, payload = null) => {
+    setRoute({ name, payload });
+    window.scrollTo(0, 0);
+  };
+
+  const isAdmin = ADMIN_ROUTES.has(route.name);
+
+  let view = null;
+  switch (route.name) {
+    // ── Home ──────────────────────────────────────────────────────────────
+    case 'home':
+      view = <Home onNavigate={navigate} />; break;
+
+    // ── Requests ──────────────────────────────────────────────────────────
+    case 'requests':
+      view = <RequestsBrowse
+        onOpen={id=>navigate('request-detail',id)}
+        onCreate={()=>navigate('request-create')} />; break;
+    case 'request-detail':
+      view = <RequestDetail
+        id={route.payload||'r1'}
+        onBack={()=>navigate('requests')}
+        onNavigate={navigate} />; break;
+    case 'request-create':
+      view = <RequestCreate
+        onCancel={()=>navigate('requests')}
+        onSubmit={()=>navigate('requests')} />; break;
+    case 'request-edit':
+      view = <RequestEdit
+        id={route.payload||'r1'}
+        onCancel={()=>navigate('request-detail', route.payload||'r1')}
+        onSave={()=>navigate('request-detail', route.payload||'r1')} />; break;
+
+    // ── Offers ────────────────────────────────────────────────────────────
+    case 'offers':
+      view = <OffersBrowse
+        onOpen={id=>navigate('offer-detail',id)}
+        onCreate={()=>navigate('offer-create')} />; break;
+    case 'offer-detail':
+      view = <OfferDetail
+        id={route.payload||'of1'}
+        onBack={()=>navigate('offers')}
+        onNavigate={navigate} />; break;
+    case 'offer-create':
+      view = <OfferCreate
+        onCancel={()=>navigate('offers')}
+        onSubmit={()=>navigate('offers')} />; break;
+    case 'offer-edit':
+      view = <OfferEdit
+        id={route.payload||'of1'}
+        onCancel={()=>navigate('offer-detail', route.payload||'of1')}
+        onSave={()=>navigate('offer-detail', route.payload||'of1')} />; break;
+
+    // ── Users ─────────────────────────────────────────────────────────────
+    case 'users':
+      view = <UsersList
+        onOpen={id=>navigate('user-profile',id)}
+        onNavigate={navigate} />; break;
+    case 'user-profile':
+      view = <UserProfile
+        id={route.payload||'u1'}
+        onBack={()=>navigate('users')}
+        onNavigate={navigate} />; break;
+    case 'user-create':
+      view = <UserCreate
+        onCancel={()=>navigate('users')}
+        onSubmit={()=>navigate('users')} />; break;
+    case 'user-edit':
+      view = <UserEdit
+        id={route.payload||'u5'}
+        onCancel={()=>navigate('user-profile', route.payload||'u5')}
+        onSave={()=>navigate('user-profile', route.payload||'u5')} />; break;
+    case 'my-listings':
+      view = <MyListings onNavigate={navigate} />; break;
+
+    // ── Organizations ─────────────────────────────────────────────────────
+    case 'orgs':
+      view = <OrgsList
+        onOpen={id=>navigate('org-detail',id)}
+        onNavigate={navigate} />; break;
+    case 'org-detail':
+      view = <OrgDetail
+        id={route.payload||'o1'}
+        onBack={()=>navigate('orgs')}
+        onNavigate={navigate} />; break;
+    case 'org-create':
+      view = <OrgCreate
+        onCancel={()=>navigate('orgs')}
+        onSubmit={()=>navigate('orgs')} />; break;
+    case 'org-edit':
+      view = <OrgEdit
+        id={route.payload||'o1'}
+        onCancel={()=>navigate('org-detail', route.payload||'o1')}
+        onSave={()=>navigate('org-detail', route.payload||'o1')} />; break;
+
+    // ── Service Types ─────────────────────────────────────────────────────
+    case 'service-types':
+      view = <ServiceTypesList onNavigate={navigate} />; break;
+    case 'service-type-detail':
+      view = <ServiceTypeDetail
+        id={route.payload||'st1'}
+        onBack={()=>navigate('service-types')}
+        onNavigate={navigate} />; break;
+    case 'suggest-service-type':
+      view = <SuggestServiceType onCancel={()=>navigate('service-types')} onSubmit={()=>navigate('service-types')} />; break;
+    case 'tags':
+      view = <TagsPage tag={route.payload||'Mentoring'} onNavigate={navigate} />; break;
+    case 'profile-guard':
+      view = <ProfileGuard onNavigate={navigate} />; break;
+    case 'connecting':
+      view = <ConnectionScreen />; break;
+
+    // ── Admin ─────────────────────────────────────────────────────────────
+    case 'admin':
+      view = <AdminDashboard onNavigate={navigate} />; break;
+    case 'admin-mediums':
+      view = <AdminMediums onNavigate={navigate} />; break;
+    case 'admin-service-types':
+      view = <AdminServiceTypesPage onNavigate={navigate} />; break;
+    case 'admin-orgs':
+      view = <AdminOrgsPage onNavigate={navigate} />; break;
+    case 'admin-requests':
+      view = <AdminRequestsPage onNavigate={navigate} />; break;
+    case 'admin-offers':
+      view = <AdminOffersPage onNavigate={navigate} />; break;
+    case 'admin-administrators':
+      view = <AdminAdministrators onNavigate={navigate} />; break;
+
+    default:
+      view = <div style={{maxWidth:900, margin:'40px auto', textAlign:'center', color:'rgb(var(--fg-2))'}}>
+        <h1 className="page-h1">{route.name}</h1>
+        <p className="page-lead">This screen isn't mocked yet.</p>
+        <button className="btn btn-primary" style={{marginTop:16}} onClick={()=>navigate('home')}>← Home</button>
+      </div>;
+  }
+
+  return (
+    <ModalProvider>
+      <Shell route={route.name} onNavigate={navigate} isAdmin={isAdmin}>
+        {view}
+        {!isAdmin && (
+          <div className="proto-hint">
+            <b>Prototype</b> · hAppenings Requests &amp; Offers · Press <b>M</b> or 🗺️ Map to browse all screens
+          </div>
+        )}
+      </Shell>
+    </ModalProvider>
+  );
+}
+
+function StyleInjector() {
+  useEffect(() => {
+    const el = document.createElement('style');
+    el.textContent = [
+      window.buttonStyles,
+      window.badgeStyles,
+      window.inputStyles,
+      window.cardStyles,
+      window.shellStyles,
+      window.screenStyles,
+      window.offerScreenStyles,
+      window.userScreenStyles,
+      window.orgScreenStyles,
+      window.miscScreenStyles,
+      window.editScreenStyles,
+      window.adminScreenStyles,
+      window.modalStyles,
+    ].filter(Boolean).join('\n');
+    document.head.appendChild(el);
+    return () => el.remove();
+  }, []);
+  return null;
+}
+
+const root = ReactDOM.createRoot(document.getElementById('app'));
+root.render(<><StyleInjector /><App /></>);
+</script>
+</body>
+</html>

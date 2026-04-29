@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Badges & status</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; padding: 18px; background: rgb(var(--bg-app)); font-family: var(--font-base); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;}
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: 9999px; padding: 4px 10px;
+    font-size: 12px; font-weight: 600;
+  }
+  .c-primary { background: rgb(var(--color-primary-100)); color: rgb(var(--color-primary-800));}
+  .c-secondary { background: rgb(var(--color-secondary-100)); color: rgb(var(--color-secondary-900));}
+  .c-tertiary { background: rgb(var(--color-tertiary-100)); color: rgb(var(--color-tertiary-800));}
+  .c-warning { background: rgb(var(--color-warning-100)); color: rgb(var(--color-warning-800));}
+  .c-success { background: rgb(var(--color-success-100)); color: rgb(var(--color-success-900));}
+  .c-error { background: rgb(var(--color-error-100)); color: rgb(var(--color-error-800));}
+  .c-surface { background: rgb(var(--color-surface-100)); color: rgb(var(--color-surface-800));}
+  .status {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 9999px; padding: 4px 12px;
+    background: #fff; font-size: 12px; color: rgb(var(--fg-2));
+  }
+</style>
+</head>
+<body>
+  <div class="row">
+    <span class="chip c-primary">📋 Active</span>
+    <span class="chip c-warning">📦 Archived</span>
+    <span class="chip c-success">Accepted</span>
+    <span class="chip c-error">⚙️ Admin</span>
+    <span class="chip c-secondary">🏷️ Service Type</span>
+    <span class="chip c-tertiary">🏢 Organization</span>
+    <span class="chip c-surface">Pending</span>
+  </div>
+  <div class="row">
+    <span class="status">🟢 Connected</span>
+    <span class="status">🟡 Checking…</span>
+    <span class="status">🟠 Disconnected</span>
+    <span class="status">🔴 Error</span>
+  </div>
+</body>
+</html>

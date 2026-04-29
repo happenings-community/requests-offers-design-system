@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Action card</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; padding: 18px; background: rgb(var(--bg-muted)); font-family: var(--font-base); }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .card {
+    background: #fff; border: 1px solid rgb(var(--border-1));
+    border-radius: 12px; padding: 18px; box-shadow: var(--shadow-md);
+    text-align: center;
+  }
+  .card .icon { font-size: 32px; margin-bottom: 8px;}
+  .card h3 { margin: 0 0 6px; font-size: 16px; color: rgb(var(--fg-1)); font-weight: 600;}
+  .card p { margin: 0 0 12px; font-size: 13px; line-height: 1.45; color: rgb(var(--fg-2));}
+  .btn { display: inline-block; border-radius: 9999px; padding: 6px 16px; font-size: 13px; font-weight: 600; color: #111;}
+  .b-sec { background: rgb(var(--color-secondary-500));}
+  .b-warn { background: rgb(var(--color-warning-500));}
+  .b-ter { background: rgb(var(--color-tertiary-500));}
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="card">
+      <div class="icon">🔍</div>
+      <h3>Discover Opportunities</h3>
+      <p>Browse requests from the community and find ways to help.</p>
+      <span class="btn b-sec">Explore</span>
+    </div>
+    <div class="card">
+      <div class="icon">✨</div>
+      <h3>Offer Your Skills</h3>
+      <p>Share your expertise and help others in the community.</p>
+      <span class="btn b-warn">Explore</span>
+    </div>
+    <div class="card">
+      <div class="icon">👥</div>
+      <h3>Explore Community</h3>
+      <p>Connect with other members and organizations.</p>
+      <span class="btn b-ter">Explore</span>
+    </div>
+  </div>
+</body>
+</html>

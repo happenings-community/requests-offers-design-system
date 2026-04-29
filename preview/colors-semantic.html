@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Semantic colors</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; padding: 16px; background: rgb(var(--bg-app)); font-family: var(--font-base); }
+  .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .tile { border-radius: 8px; padding: 14px; color: #111; min-height: 96px; display: flex; flex-direction: column; justify-content: space-between; }
+  .tile h5 { margin: 0; font-size: 13px; font-weight: 600; }
+  .tile .hex { font-family: var(--font-mono); font-size: 11px; opacity: .85;}
+  .tile .role { font-size: 11px; opacity: .85;}
+  .success { background: rgb(var(--color-success-500)); }
+  .warning { background: rgb(var(--color-warning-500)); }
+  .error   { background: rgb(var(--color-error-500));   color: #fff;}
+  .surface { background: rgb(var(--color-surface-500)); color: #fff;}
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="tile success"><h5>Success</h5><div><div class="hex">#84cc16</div><div class="role">accepted · approved</div></div></div>
+    <div class="tile warning"><h5>Warning</h5><div><div class="hex">#ff8800</div><div class="role">offers · archived</div></div></div>
+    <div class="tile error"><h5>Error</h5><div><div class="hex">#d21919</div><div class="role">admin · destructive</div></div></div>
+    <div class="tile surface"><h5>Surface</h5><div><div class="hex">#495a8f</div><div class="role">drawers · dark mode</div></div></div>
+  </div>
+</body>
+</html>

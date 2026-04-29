@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Type — body & utility</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; padding: 18px; background: rgb(var(--bg-app)); font-family: var(--font-base); color: rgb(var(--fg-1));}
+  .grid { display: grid; grid-template-columns: 96px 1fr; row-gap: 10px; column-gap: 16px; align-items: baseline; }
+  .tag { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: rgb(var(--fg-3));}
+  .lead { font-size: 18px; line-height: 28px; color: rgb(var(--fg-2)); margin: 0;}
+  .body { font-size: 16px; line-height: 24px; margin: 0;}
+  .small { font-size: 14px; line-height: 20px; color: rgb(var(--fg-2)); margin: 0;}
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: rgb(var(--fg-2)); font-weight: 600;}
+  code { font-family: var(--font-mono); font-size: 13px; background: rgb(var(--color-surface-100)); padding: 2px 6px; border-radius: 4px;}
+</style>
+</head>
+<body>
+  <div class="grid">
+    <span class="tag">Eyebrow</span><span class="eyebrow">Mutual aid · Holochain</span>
+    <span class="tag">Lead · 18</span><p class="lead">Connect with the Holochain community to exchange skills, resources, and support.</p>
+    <span class="tag">Body · 16</span><p class="body">Whether you're looking for help or offering your expertise, this is your place to collaborate.</p>
+    <span class="tag">Small · 14</span><p class="small">Profile Approval Required · created 3 days ago</p>
+    <span class="tag">Mono · 13</span><span><code>VITE_MOCK_BUTTONS_ENABLED=false</code></span>
+  </div>
+</body>
+</html>

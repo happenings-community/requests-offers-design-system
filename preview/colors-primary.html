@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Primary palette</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; padding: 16px; background: rgb(var(--bg-app)); font-family: var(--font-base); }
+  h4 { margin: 0 0 10px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: rgb(var(--fg-2)); font-weight: 600; }
+  .group { margin-bottom: 14px; }
+  .scale { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+  .swatch { aspect-ratio: 1.6 / 1; border-radius: 6px; display: flex; align-items: flex-end; padding: 4px 6px; font-size: 10px; font-weight: 600; }
+  .scale .s50  { background: rgb(var(--color-primary-50));  color: #111; }
+  .scale .s100 { background: rgb(var(--color-primary-100)); color: #111; }
+  .scale .s200 { background: rgb(var(--color-primary-200)); color: #111; }
+  .scale .s300 { background: rgb(var(--color-primary-300)); color: #111; }
+  .scale .s400 { background: rgb(var(--color-primary-400)); color: #fff; }
+  .scale .s500 { background: rgb(var(--color-primary-500)); color: #fff; outline: 2px solid rgb(var(--color-primary-700)); outline-offset: -2px;}
+  .scale .s600 { background: rgb(var(--color-primary-600)); color: #fff; }
+  .scale .s700 { background: rgb(var(--color-primary-700)); color: #fff; }
+  .scale .s800 { background: rgb(var(--color-primary-800)); color: #fff; }
+  .scale .s900 { background: rgb(var(--color-primary-900)); color: #fff; }
+  .meta { display: flex; justify-content: space-between; font-size: 11px; color: rgb(var(--fg-2)); margin-top: 6px;}
+</style>
+</head>
+<body>
+  <div class="group">
+    <h4>Primary · royal violet · #4720b7</h4>
+    <div class="scale">
+      <div class="swatch s50">50</div>
+      <div class="swatch s100">100</div>
+      <div class="swatch s200">200</div>
+      <div class="swatch s300">300</div>
+      <div class="swatch s400">400</div>
+      <div class="swatch s500">500</div>
+      <div class="swatch s600">600</div>
+      <div class="swatch s700">700</div>
+      <div class="swatch s800">800</div>
+      <div class="swatch s900">900</div>
+    </div>
+    <div class="meta"><span>nav · primary buttons · headings · links</span><span>500 = brand</span></div>
+  </div>
+</body>
+</html>

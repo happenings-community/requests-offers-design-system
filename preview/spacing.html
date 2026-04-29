@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Spacing scale</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; padding: 18px; background: rgb(var(--bg-app)); font-family: var(--font-base); color: rgb(var(--fg-1)); }
+  .row { display: grid; grid-template-columns: 64px 1fr; row-gap: 8px; column-gap: 12px; align-items: center; font-size: 12px; }
+  .lbl { font-family: var(--font-mono); color: rgb(var(--fg-2)); }
+  .bar { height: 14px; background: rgb(var(--color-primary-500)); border-radius: 4px; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <span class="lbl">4 · 1</span>  <div class="bar" style="width:4px"></div>
+    <span class="lbl">8 · 2</span>  <div class="bar" style="width:8px"></div>
+    <span class="lbl">12 · 3</span> <div class="bar" style="width:12px"></div>
+    <span class="lbl">16 · 4</span> <div class="bar" style="width:16px"></div>
+    <span class="lbl">24 · 6</span> <div class="bar" style="width:24px"></div>
+    <span class="lbl">32 · 8</span> <div class="bar" style="width:32px"></div>
+    <span class="lbl">48 · 12</span><div class="bar" style="width:48px"></div>
+    <span class="lbl">64 · 16</span><div class="bar" style="width:64px"></div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Radii & shadows</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; padding: 18px; background: rgb(var(--bg-app)); font-family: var(--font-base); }
+  .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .tile { background: #fff; height: 80px; display: grid; place-items: center; font-size: 12px; color: rgb(var(--fg-2)); border: 1px solid rgb(var(--border-1));}
+  .r-sm { border-radius: 4px;}
+  .r-md { border-radius: 8px;}
+  .r-lg { border-radius: 12px;}
+  .r-pill { border-radius: 9999px;}
+  .row2 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 18px;}
+  .stile { background: #fff; border-radius: 8px; height: 80px; display: grid; place-items: center; font-size: 12px; color: rgb(var(--fg-2));}
+  .s-sm { box-shadow: var(--shadow-sm);}
+  .s-md { box-shadow: var(--shadow-md);}
+  .s-lg { box-shadow: var(--shadow-lg);}
+  .s-xl { box-shadow: var(--shadow-xl);}
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="tile r-sm">4 · sm</div>
+    <div class="tile r-md">8 · container</div>
+    <div class="tile r-lg">12 · lg</div>
+    <div class="tile r-pill">9999 · base/pill</div>
+  </div>
+  <div class="row2">
+    <div class="stile s-sm">shadow · sm</div>
+    <div class="stile s-md">shadow · md</div>
+    <div class="stile s-lg">shadow · lg</div>
+    <div class="stile s-xl">shadow · xl</div>
+  </div>
+</body>
+</html>

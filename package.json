@@ -1,0 +1,17 @@
+{
+  "name": "happenings-community-design-system",
+  "version": "0.1.0",
+  "description": "Design system and UI prototype playground for hAppenings Community CIC",
+  "license": "MIT",
+  "scripts": {
+    "dev": "npx serve . --listen 3000",
+    "dev:ui": "npx serve ui_kits/requests-and-offers --listen 3001"
+  },
+  "keywords": [
+    "design-system",
+    "holochain",
+    "happenings",
+    "svelte",
+    "tailwindcss"
+  ]
+}

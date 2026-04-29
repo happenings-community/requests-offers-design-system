@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Accent palettes</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; padding: 14px; background: rgb(var(--bg-app)); font-family: var(--font-base); }
+  h4 { margin: 0 0 6px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: rgb(var(--fg-2)); font-weight: 600; }
+  .group { margin-bottom: 8px; }
+  .scale { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; }
+  .swatch { aspect-ratio: 2.4 / 1; border-radius: 5px; display: flex; align-items: flex-end; padding: 2px 4px; font-size: 9px; font-weight: 600; }
+  /* secondary */
+  .sec .s50  { background: rgb(var(--color-secondary-50));  color: #111; }
+  .sec .s100 { background: rgb(var(--color-secondary-100)); color: #111; }
+  .sec .s200 { background: rgb(var(--color-secondary-200)); color: #111; }
+  .sec .s300 { background: rgb(var(--color-secondary-300)); color: #111; }
+  .sec .s400 { background: rgb(var(--color-secondary-400)); color: #111; }
+  .sec .s500 { background: rgb(var(--color-secondary-500)); color: #111; }
+  .sec .s600 { background: rgb(var(--color-secondary-600)); color: #111; }
+  .sec .s700 { background: rgb(var(--color-secondary-700)); color: #fff; }
+  .sec .s800 { background: rgb(var(--color-secondary-800)); color: #fff; }
+  .sec .s900 { background: rgb(var(--color-secondary-900)); color: #fff; }
+  /* tertiary */
+  .ter .s50  { background: rgb(var(--color-tertiary-50));  color: #111; }
+  .ter .s100 { background: rgb(var(--color-tertiary-100)); color: #111; }
+  .ter .s200 { background: rgb(var(--color-tertiary-200)); color: #111; }
+  .ter .s300 { background: rgb(var(--color-tertiary-300)); color: #111; }
+  .ter .s400 { background: rgb(var(--color-tertiary-400)); color: #111; }
+  .ter .s500 { background: rgb(var(--color-tertiary-500)); color: #fff; }
+  .ter .s600 { background: rgb(var(--color-tertiary-600)); color: #fff; }
+  .ter .s700 { background: rgb(var(--color-tertiary-700)); color: #fff; }
+  .ter .s800 { background: rgb(var(--color-tertiary-800)); color: #fff; }
+  .ter .s900 { background: rgb(var(--color-tertiary-900)); color: #fff; }
+  .meta { font-size: 10px; color: rgb(var(--fg-2)); margin: 4px 0 8px;}
+</style>
+</head>
+<body>
+  <div class="group sec">
+    <h4>Secondary · sun gold · #ebc634</h4>
+    <div class="scale">
+      <div class="swatch s50">50</div><div class="swatch s100">100</div>
+      <div class="swatch s200">200</div><div class="swatch s300">300</div>
+      <div class="swatch s400">400</div><div class="swatch s500">500</div>
+      <div class="swatch s600">600</div><div class="swatch s700">700</div>
+      <div class="swatch s800">800</div><div class="swatch s900">900</div>
+    </div>
+    <div class="meta">Requests CTA · accent fills · sun mark</div>
+  </div>
+  <div class="group ter">
+    <h4>Tertiary · sky cyan · #0ea5e9</h4>
+    <div class="scale">
+      <div class="swatch s50">50</div><div class="swatch s100">100</div>
+      <div class="swatch s200">200</div><div class="swatch s300">300</div>
+      <div class="swatch s400">400</div><div class="swatch s500">500</div>
+      <div class="swatch s600">600</div><div class="swatch s700">700</div>
+      <div class="swatch s800">800</div><div class="swatch s900">900</div>
+    </div>
+    <div class="meta">Community wordmark · tertiary chips</div>
+  </div>
+</body>
+</html>

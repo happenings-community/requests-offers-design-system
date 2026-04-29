@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>hAppenings Community — Design System</title>
+<link rel="icon" href="assets/icon.png" />
+<link rel="stylesheet" href="colors_and_type.css" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: rgb(var(--bg-muted));
+    font-family: var(--font-base);
+    color: rgb(var(--fg-1));
+    min-height: 100vh;
+  }
+
+  /* ── Nav ── */
+  .nav {
+    background: rgb(var(--color-primary-500));
+    height: 64px;
+    display: flex;
+    align-items: center;
+    padding: 0 32px;
+    gap: 16px;
+    box-shadow: var(--shadow-lg);
+  }
+  .nav-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: contain;
+    background: rgb(var(--color-secondary-500));
+  }
+  .nav-wordmark {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+  }
+  .nav-wordmark span { color: rgb(var(--color-tertiary-300)); }
+  .nav-badge {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 4px 12px;
+    border-radius: 9999px;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(135deg, rgb(var(--color-primary-600)), rgb(var(--color-primary-400)));
+    padding: 56px 32px 48px;
+    text-align: center;
+    color: #fff;
+  }
+  .hero-eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgb(var(--color-tertiary-300));
+    margin-bottom: 12px;
+  }
+  .hero-title {
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+  .hero-title em {
+    font-family: var(--font-display);
+    font-style: normal;
+    color: rgb(var(--color-secondary-400));
+  }
+  .hero-sub {
+    font-size: 17px;
+    color: rgba(255,255,255,0.75);
+    max-width: 540px;
+    margin: 0 auto 28px;
+    line-height: 1.55;
+  }
+  .hero-cta {
+    display: inline-block;
+    background: rgb(var(--color-secondary-500));
+    color: #000;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 11px 28px;
+    border-radius: 9999px;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .hero-cta:hover { background: rgb(var(--color-secondary-400)); }
+
+  /* ── Page container ── */
+  .page { max-width: 960px; margin: 0 auto; padding: 48px 24px 64px; }
+
+  /* ── Section heading ── */
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgb(var(--fg-2));
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgb(var(--border-1));
+  }
+
+  /* ── Grid ── */
+  .grid { display: grid; gap: 16px; margin-bottom: 48px; }
+  .grid-2 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .grid-3 { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+
+  /* ── Card ── */
+  .card {
+    background: rgb(var(--bg-elevated));
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 8px;
+    padding: 24px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.15s, border-color 0.15s;
+  }
+  .card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: rgb(var(--color-primary-300));
+  }
+  .card-icon { font-size: 28px; margin-bottom: 4px; }
+  .card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: rgb(var(--fg-1));
+  }
+  .card-desc {
+    font-size: 13px;
+    color: rgb(var(--fg-2));
+    line-height: 1.5;
+  }
+  .card-tag {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    background: rgb(var(--color-primary-50));
+    color: rgb(var(--color-primary-700));
+  }
+  .card-tag.green {
+    background: rgb(var(--color-success-50));
+    color: rgb(var(--color-success-700));
+  }
+  .card-tag.gold {
+    background: rgb(var(--color-secondary-50));
+    color: rgb(var(--color-secondary-800));
+  }
+
+  /* ── Code block ── */
+  .code-block {
+    background: rgb(var(--color-surface-800));
+    color: rgb(var(--color-surface-100));
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 48px;
+    overflow-x: auto;
+    line-height: 1.6;
+  }
+  .code-block .comment { color: rgb(var(--color-surface-400)); }
+  .code-block .cmd { color: rgb(var(--color-secondary-300)); }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    padding: 32px;
+    font-size: 13px;
+    color: rgb(var(--fg-3));
+    border-top: 1px solid rgb(var(--border-1));
+    background: rgb(var(--bg-elevated));
+  }
+  .footer a { color: rgb(var(--fg-link)); text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <img src="assets/icon.png" alt="" class="nav-logo" />
+  <span class="nav-wordmark">h<span>A</span>ppenings</span>
+  <span class="nav-badge">Design System · alpha</span>
+</nav>
+
+<div class="hero">
+  <p class="hero-eyebrow">hAppenings Community CIC</p>
+  <h1 class="hero-title">The <em>hAppenings</em> Design System</h1>
+  <p class="hero-sub">Color tokens, typography, components, and interactive prototypes for the Requests &amp; Offers peer-to-peer platform.</p>
+  <a href="ui_kits/requests-and-offers/" class="hero-cta">Open interactive prototype →</a>
+</div>
+
+<main class="page">
+
+  <!-- Quick start -->
+  <p class="section-label">Quick start</p>
+  <div class="code-block">
+    <span class="comment"># serve the full design system locally</span><br />
+    <span class="cmd">npm run dev</span>  <span class="comment"># → http://localhost:3000</span><br /><br />
+    <span class="comment"># or serve just the prototype (no node_modules needed)</span><br />
+    <span class="cmd">npx serve ui_kits/requests-and-offers --listen 3001</span>
+  </div>
+
+  <!-- Prototype -->
+  <p class="section-label">Interactive prototype</p>
+  <div class="grid grid-2" style="margin-bottom:48px">
+    <a href="ui_kits/requests-and-offers/" class="card">
+      <div class="card-icon">🖥️</div>
+      <div class="card-title">Requests &amp; Offers — Full prototype</div>
+      <div class="card-desc">30+ screens: home, requests, offers, users, organizations, service types, and admin. Click-through navigation with mock data.</div>
+      <span class="card-tag green">Live prototype</span>
+    </a>
+  </div>
+
+  <!-- Token previews -->
+  <p class="section-label">Design tokens</p>
+  <div class="grid grid-3">
+    <a href="preview/colors-primary.html" class="card">
+      <div class="card-icon">🟣</div>
+      <div class="card-title">Primary palette</div>
+      <div class="card-desc">Royal violet — nav, buttons, headings, links.</div>
+      <span class="card-tag">Colors</span>
+    </a>
+    <a href="preview/colors-accents.html" class="card">
+      <div class="card-icon">🟡</div>
+      <div class="card-title">Accent palettes</div>
+      <div class="card-desc">Sun gold, sky cyan, success, warning, error.</div>
+      <span class="card-tag">Colors</span>
+    </a>
+    <a href="preview/colors-semantic.html" class="card">
+      <div class="card-icon">🎨</div>
+      <div class="card-title">Semantic colors</div>
+      <div class="card-desc">Surface backgrounds, foreground ink, border.</div>
+      <span class="card-tag">Colors</span>
+    </a>
+    <a href="preview/type-display.html" class="card">
+      <div class="card-icon">Aa</div>
+      <div class="card-title">Display type</div>
+      <div class="card-desc">Caveat (display), Inter headings, scale.</div>
+      <span class="card-tag">Typography</span>
+    </a>
+    <a href="preview/type-body.html" class="card">
+      <div class="card-icon">¶</div>
+      <div class="card-title">Body type</div>
+      <div class="card-desc">Inter body, small, muted, link, code styles.</div>
+      <span class="card-tag">Typography</span>
+    </a>
+    <a href="preview/spacing.html" class="card">
+      <div class="card-icon">↔️</div>
+      <div class="card-title">Spacing scale</div>
+      <div class="card-desc">4–64px spacing tokens matching Tailwind.</div>
+      <span class="card-tag gold">Spacing</span>
+    </a>
+    <a href="preview/radii-shadows.html" class="card">
+      <div class="card-icon">⬜</div>
+      <div class="card-title">Radii &amp; shadows</div>
+      <div class="card-desc">Pill (9999px) buttons, 8px cards, shadow scale.</div>
+      <span class="card-tag gold">Radii</span>
+    </a>
+    <a href="preview/iconography.html" class="card">
+      <div class="card-icon">🏷️</div>
+      <div class="card-title">Iconography</div>
+      <div class="card-desc">Emoji icon vocabulary used across the app.</div>
+      <span class="card-tag">Icons</span>
+    </a>
+    <a href="preview/logos.html" class="card">
+      <div class="card-icon">🌟</div>
+      <div class="card-title">Logos &amp; brand</div>
+      <div class="card-desc">CIC logo, wordmark, sun icon, default avatar.</div>
+      <span class="card-tag">Brand</span>
+    </a>
+  </div>
+
+  <!-- Component previews -->
+  <p class="section-label">Components</p>
+  <div class="grid grid-3">
+    <a href="preview/components-buttons.html" class="card">
+      <div class="card-icon">🔘</div>
+      <div class="card-title">Buttons</div>
+      <div class="card-desc">Primary, secondary, warning, tertiary, ghost, soft variants.</div>
+      <span class="card-tag green">Components</span>
+    </a>
+    <a href="preview/components-badges.html" class="card">
+      <div class="card-icon">🏷️</div>
+      <div class="card-title">Badges &amp; chips</div>
+      <div class="card-desc">Status pills, service-type chips, connection dots.</div>
+      <span class="card-tag green">Components</span>
+    </a>
+    <a href="preview/components-cards.html" class="card">
+      <div class="card-icon">🃏</div>
+      <div class="card-title">Cards</div>
+      <div class="card-desc">Action cards and listing cards with hover states.</div>
+      <span class="card-tag green">Components</span>
+    </a>
+    <a href="preview/components-inputs.html" class="card">
+      <div class="card-icon">✏️</div>
+      <div class="card-title">Form inputs</div>
+      <div class="card-desc">Text input, textarea, select — Skeleton-matched styles.</div>
+      <span class="card-tag green">Components</span>
+    </a>
+    <a href="preview/components-nav.html" class="card">
+      <div class="card-icon">🧭</div>
+      <div class="card-title">Navigation</div>
+      <div class="card-desc">Top nav bar, mobile drawer, admin badge.</div>
+      <span class="card-tag green">Components</span>
+    </a>
+  </div>
+
+  <!-- Source files -->
+  <p class="section-label">Source files</p>
+  <div class="grid grid-2">
+    <a href="colors_and_type.css" class="card">
+      <div class="card-icon">🎨</div>
+      <div class="card-title">colors_and_type.css</div>
+      <div class="card-desc">All color tokens (RGB triplets), semantic foreground/background, typography scale, spacing, shadows, and semantic element classes.</div>
+      <span class="card-tag">CSS</span>
+    </a>
+    <a href="README.md" class="card">
+      <div class="card-icon">📖</div>
+      <div class="card-title">Design system README</div>
+      <div class="card-desc">Full reference: visual foundations, content voice, iconography, component recipes, and caveats.</div>
+      <span class="card-tag">Docs</span>
+    </a>
+  </div>
+
+</main>
+
+<footer class="footer">
+  <p>hAppenings Community CIC · MIT License · <a href="CONTRIBUTING.md">Contributing</a> · <a href="https://happenings.community/">happenings.community</a></p>
+</footer>
+
+</body>
+</html>

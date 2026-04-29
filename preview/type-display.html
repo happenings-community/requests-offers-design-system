@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Type — display & headings</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; padding: 18px; background: rgb(var(--bg-app)); }
+  .row { display: grid; grid-template-columns: 80px 1fr; row-gap: 10px; column-gap: 16px; align-items: baseline; }
+  .tag { font-family: var(--font-base); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: rgb(var(--fg-3)); padding-top: 6px; }
+  .display { font-family: var(--font-display); font-weight: 700; font-size: 56px; line-height: 1; color: rgb(var(--color-primary-500)); }
+  .h1 { font-family: var(--font-heading); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: rgb(var(--color-primary-700)); margin: 0;}
+  .h2 { font-family: var(--font-heading); font-size: 30px; line-height: 1.15; font-weight: 700; color: rgb(var(--fg-1)); margin: 0;}
+  .h3 { font-family: var(--font-heading); font-size: 24px; line-height: 1.25; font-weight: 600; color: rgb(var(--fg-1)); margin: 0;}
+</style>
+</head>
+<body>
+  <div class="row">
+    <span class="tag">Display</span><span class="display">hAppenings</span>
+    <span class="tag">H1 · 36</span><h1 class="h1">Welcome to Requests &amp; Offers</h1>
+    <span class="tag">H2 · 30</span><h2 class="h2">Join the Community</h2>
+    <span class="tag">H3 · 24</span><h3 class="h3">Discover Opportunities</h3>
+  </div>
+</body>
+</html>

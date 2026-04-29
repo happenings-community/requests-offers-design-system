@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Inputs</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { margin: 0; padding: 18px; background: rgb(var(--bg-app)); font-family: var(--font-base); }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  label { font-size: 12px; font-weight: 600; color: rgb(var(--fg-1));}
+  input, textarea, select {
+    font: inherit; font-size: 14px;
+    border: 1px solid rgb(var(--border-2));
+    border-radius: 8px;
+    padding: 9px 12px; background: #fff; color: rgb(var(--fg-1));
+    outline: none;
+    transition: border-color 150ms, box-shadow 150ms;
+  }
+  input:focus, textarea:focus, select:focus {
+    border-color: rgb(var(--color-primary-500));
+    box-shadow: 0 0 0 3px rgb(var(--color-primary-200) / .6);
+  }
+  .help { font-size: 11px; color: rgb(var(--fg-2));}
+</style>
+</head>
+<body>
+  <div class="field">
+    <label>Title</label>
+    <input value="Looking for a Holochain mentor" />
+    <span class="help">Short, action-first. Sentence case.</span>
+  </div>
+  <div class="field">
+    <label>Service type</label>
+    <select><option>Mentoring</option><option>Design</option><option>Development</option></select>
+  </div>
+  <div class="field">
+    <label>Description</label>
+    <textarea rows="2">Looking to chat with someone who's deployed an hApp to production.</textarea>
+  </div>
+</body>
+</html>
