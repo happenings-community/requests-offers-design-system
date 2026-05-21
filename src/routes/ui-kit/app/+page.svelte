@@ -833,8 +833,7 @@
           <p class="ds-p approve-agreements-intro approve-agreements-intro--bold">
             Before you join, please read our community agreements. These are
             the commitments we make to each other as a community. By joining,
-            you are cryptographically attesting that you have read and
-            accepted them — your signature on these agreements is part of
+            you commit to these community agreements as part of
             becoming a member.
           </p>
 
@@ -1014,7 +1013,7 @@
             onclick={handleSignAndJoin}
           >
             {#if joining.isLoading}
-              ⏳ Signing and binding…
+              ⏳ Setting up your access…
             {:else}
               ✍️ Sign and join Requests &amp; Offers
             {/if}
@@ -1110,7 +1109,7 @@
       </form>
     </div>
 
-  <!-- ── JOIN SET PASSWORD ── post-Sig-3, encrypts the new lair keystore ── -->
+  <!-- ── JOIN SET PASSWORD ── post-provisioning, encrypts the new lair keystore ── -->
   {:else if route === 'join-set-password'}
     <div class="centered-screen">
       <div class="join-card join-card--wide join-card--compact">
@@ -1193,7 +1192,7 @@
       </div>
     </div>
 
-  <!-- ── PASSWORD GATE ── returning-user unlock (Layer 1 instance protection) ── -->
+  <!-- ── PASSWORD GATE ── returning-user unlock ── -->
   {:else if route === 'password-gate'}
     <div class="centered-screen">
       <div class="join-card">
@@ -1212,7 +1211,7 @@
               class="ds-input"
               bind:value={pgEmail}
               placeholder="The one you used to apply"
-              autocomplete="username email"
+              autocomplete="username"
             />
           </div>
           <div class="field">
