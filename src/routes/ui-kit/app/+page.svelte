@@ -328,6 +328,31 @@
       pgPassword = '';
     }
   }
+
+  // Demo-only: flip between temporary and indefinite suspension on member-suspended
+  // so the show-and-tell can see both conditional renderings without re-routing.
+  function setSuspensionForDemo(kind: 'temporary' | 'indefinite') {
+    if (kind === 'temporary') {
+      joining.__setStatusForDemo('member-suspended', {
+        memberStatus: {
+          status_type: 'suspended temporarily',
+          reason: 'Sustained disruption of discussion across multiple threads.',
+          suspended_until: '2026-06-15T00:00:00Z',
+          created_at: Date.parse('2026-05-18T14:30:00Z'),
+          updated_at: Date.parse('2026-05-18T14:30:00Z'),
+        }
+      });
+    } else {
+      joining.__setStatusForDemo('member-suspended', {
+        memberStatus: {
+          status_type: 'suspended indefinitely',
+          reason: 'Pattern of behaviour incompatible with the community agreements.',
+          created_at: Date.parse('2026-05-18T14:30:00Z'),
+          updated_at: Date.parse('2026-05-18T14:30:00Z'),
+        }
+      });
+    }
+  }
 </script>
 
 <!-- ══════════════════════════════════════════════════════════
@@ -675,7 +700,9 @@
   {:else if route === 'join-pending'}
     <div class="join-page">
       <div class="join-hero">
-        <h1 class="ds-h2">Application sent</h1>
+        <h1 class="ds-h1">Welcome to Requests &amp; Offers</h1>
+        <h2 class="ds-h2 join-subhead">Holochain Ecosystem</h2>
+        <h2 class="ds-h3 join-pending-status">Application sent</h2>
         <p class="ds-p">
           Your application will be reviewed in the next 48 hours. Keep an eye on your email
           inbox at <strong>{joining.application?.data.email ?? 'the address you provided'}</strong>
@@ -963,6 +990,73 @@
         </div>
       </div>
     {/if}
+
+  <!-- ── MEMBER SUSPENDED ── post-authentication, admin-restricted access ── -->
+  {:else if route === 'member-suspended'}
+    <div class="centered-screen">
+      <div class="join-card join-card--wide">
+        <div class="suspended-header">
+          <div class="suspended-icon" aria-hidden="true">⛔</div>
+          <h1 class="ds-h2" style="margin: 0">Your account is currently suspended</h1>
+        </div>
+        <p class="ds-p suspended-intro">
+          An admin has temporarily restricted your access to Requests &amp; Offers.
+        </p>
+
+        {#if joining.memberStatus}
+          <div class="suspended-detail">
+            <p class="suspended-detail-label">Reason</p>
+            <p class="suspended-detail-value">
+              {joining.memberStatus.reason ?? 'No reason was provided.'}
+            </p>
+          </div>
+
+          <div class="suspended-detail">
+            <p class="suspended-detail-label">Suspension ends</p>
+            <p class="suspended-detail-value">
+              {#if joining.memberStatus.suspended_until}
+                {new Date(joining.memberStatus.suspended_until).toLocaleString(undefined, {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              {:else}
+                Suspension is open-ended.
+              {/if}
+            </p>
+          </div>
+        {/if}
+
+        <p class="ds-p suspended-recourse">
+          If you believe this is in error, or if you'd like to discuss the suspension,
+          please email <a href="mailto:info@happenings.community">info@happenings.community</a>.
+        </p>
+
+        <div class="join-actions">
+          <a class="btn-ds btn-ds--primary" href="mailto:info@happenings.community">
+            ✉️ Email info@happenings.community
+          </a>
+        </div>
+
+        <!-- Demo toggle: flip between temporary and indefinite suspension. -->
+        <div class="suspended-demo-toggle">
+          <span class="ds-small" style="color: rgb(var(--fg-3))">Demo:</span>
+          <button
+            type="button"
+            class="btn-ghost btn-ghost--sm"
+            onclick={() => setSuspensionForDemo('temporary')}
+          >Temporary</button>
+          <button
+            type="button"
+            class="btn-ghost btn-ghost--sm"
+            onclick={() => setSuspensionForDemo('indefinite')}
+          >Indefinite</button>
+        </div>
+      </div>
+    </div>
 
   {:else if route === 'home'}
     <div class="page">
@@ -2510,6 +2604,64 @@
   }
   .btn-ds--disabled:hover,
   .btn-ds:disabled:hover { box-shadow: none; }
+
+  /* Join-pending status sub-heading sits below the twin-headline pair. */
+  .join-pending-status {
+    margin: 12px 0 0;
+    color: rgb(var(--fg-1));
+  }
+
+  /* ── Wave 3a — member-suspended screen ─────────────────────────────────── */
+
+  .suspended-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    text-align: left;
+  }
+  .suspended-icon {
+    font-size: 56px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .suspended-intro {
+    text-align: left;
+    margin: 0;
+    color: rgb(var(--fg-2));
+  }
+  .suspended-detail {
+    padding: 12px 14px;
+    background: rgb(var(--bg-muted));
+    border-radius: 10px;
+    text-align: left;
+  }
+  .suspended-detail-label {
+    margin: 0 0 4px;
+    font: 700 13px/18px var(--font-base);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgb(var(--fg-1));
+  }
+  .suspended-detail-value {
+    margin: 0;
+    font: 400 14px/20px var(--font-base);
+    color: rgb(var(--fg-1));
+  }
+  .suspended-recourse {
+    text-align: left;
+    margin: 4px 0 0;
+    color: rgb(var(--fg-2));
+    line-height: 1.5;
+  }
+  .suspended-demo-toggle {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed rgb(var(--border-1));
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+  }
 
   /* Demo controls — fixed bottom-right, always visible. */
   .demo-controls {
