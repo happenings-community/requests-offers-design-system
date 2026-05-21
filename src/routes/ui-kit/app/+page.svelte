@@ -287,6 +287,22 @@
 
   // join-set-password fields. Confirm field prevents typos becoming
   // unrecoverable; matches PasswordSchema's likely "8 chars minimum".
+  // Recent Activity feed — interleaved merge of REQUESTS and OFFERS for the
+  // home dashboard. Mock items have no timestamp field, so 'recency' is
+  // implicit-by-array-position (matching the existing OFFERS.slice / .slice
+  // patterns used elsewhere in this mockup). In production this would come
+  // from a Holochain query against the member's source chain links + DHT
+  // recent-activity index, sorted by commit timestamp.
+  const RECENT_ACTIVITY: Array<{
+    kind: 'request' | 'offer';
+    id: string;
+    title: string;
+    creator: User;
+  }> = [
+    ...REQUESTS.map(r => ({ kind: 'request' as const, id: r.id, title: r.title, creator: r.creator })),
+    ...OFFERS.map(o   => ({ kind: 'offer'   as const, id: o.id, title: o.title, creator: o.creator }))
+  ];
+
   let pwSet = $state('');
   let pwSetConfirm = $state('');
   let pwSetShow = $state(false);
@@ -1548,73 +1564,134 @@
 
   {:else if route === 'home'}
     <div class="page">
-      {#if !hasProfile}
-        <!-- New user -->
-        <div class="home-hero">
-          <h1 class="ds-h2">Welcome to Requests &amp; Offers</h1>
-          <p class="ds-p" style="color:rgb(var(--fg-2));max-width:520px;text-align:center">Connect with the hAppenings community to exchange skills, resources, and support.</p>
-          <button class="btn-ds btn-ds--primary" onclick={() => navigate('user-create')}>👤 Join the Community</button>
+      <!--
+        Existing-user view only — the "new user" fork has been removed.
+        Post joining-flow architecture, a not-yet-bound user never reaches /home
+        (the composable routes them to join-welcome via the route-on-transition
+        $effect). Reaching /home implies status === 'authenticated', so the
+        "new user" branch was dead code.
+
+        Welcome-header identity:
+          In production, this should come from useUserAccessGuard.currentUser,
+          which reflects the post-Sig-3 UserProfile entry on the member source
+          chain. For the mockup we read joining.application?.data as a proxy
+          since the composable seeds it via __setStatusForDemo. The ME constant
+          remains as the data-graph anchor for REQUESTS/OFFERS counts until the
+          mock graph is re-wired around useUserAccessGuard.
+      -->
+      <!--
+        Hello banner — uses the canonical .banner pattern from the design
+        system (see src/routes/ui-kit/browse-active/+page.svelte). CSS copied
+        into this file's <style> block since .banner is currently scoped to
+        the browse-active scenario; lifting it to a global stylesheet is a
+        design-system housekeeping task for after the show-and-tell.
+      -->
+      <div class="banner">
+        <h2>Hello {joining.application?.data.nickname ?? joining.application?.data.givenName ?? ME.nickname}</h2>
+        <p>
+          {REQUESTS.filter(r=>r.creator.id===ME.id&&r.status==='active').length} active requests
+          · {OFFERS.filter(o=>o.creator.id===ME.id&&o.status==='active').length} active offers
+        </p>
+      </div>
+
+      <!--
+        Dashboard card: Recent Activity (latest requests + offers, time-sorted)
+        side-by-side with News & Events. Uses the existing .listing-card visual
+        vocabulary so the home page does not introduce a new design dialect.
+        News & Events content is placeholder — architecture and content TBD by
+        Anita and Sacha.
+      -->
+      <div class="listing-card listing-card--managed home-dashboard">
+        <div class="home-dashboard-section home-dashboard-section--activity">
+          <header class="home-dashboard-header">
+            <h3 class="ds-h4 home-dashboard-title">Recent Activity</h3>
+            <button
+              class="home-dashboard-link"
+              onclick={() => navigate('requests')}
+            >See all →</button>
+          </header>
+          <ul class="home-dashboard-list">
+            {#each RECENT_ACTIVITY.slice(0, 5) as item (item.kind + ':' + item.id)}
+              <li>
+                <button
+                  class="home-dashboard-item"
+                  onclick={() => navigate(item.kind === 'offer' ? 'offer-detail' : 'request-detail', item.id)}
+                >
+                  <ds-chip tone={item.kind === 'offer' ? 'warning' : 'secondary'}>
+                    {item.kind === 'offer' ? '💡 Offer' : '📝 Request'}
+                  </ds-chip>
+                  <span class="home-dashboard-item-title">{item.title}</span>
+                  <span class="home-dashboard-item-meta">{item.creator.nickname}</span>
+                </button>
+              </li>
+            {/each}
+          </ul>
         </div>
-        <div class="action-grid">
-          <button class="action-card" onclick={() => navigate('requests')}>
-            <div class="action-card-icon">🔍</div>
-            <h3 class="action-card-title">Discover Opportunities</h3>
-            <p class="action-card-desc">Browse active requests from community members looking for skills.</p>
-            <span class="action-card-cta cta--secondary">Browse Requests</span>
-          </button>
-          <button class="action-card" onclick={() => navigate('offers')}>
-            <div class="action-card-icon">✨</div>
-            <h3 class="action-card-title">Offer Your Skills</h3>
-            <p class="action-card-desc">Share what you can contribute to the community.</p>
-            <span class="action-card-cta cta--warning">Post an Offer</span>
-          </button>
-          <button class="action-card" onclick={() => navigate('users')}>
-            <div class="action-card-icon">👥</div>
-            <h3 class="action-card-title">Explore Community</h3>
-            <p class="action-card-desc">Meet members and organisations working together.</p>
-            <span class="action-card-cta cta--tertiary">Meet People</span>
-          </button>
+
+        <div class="home-dashboard-divider" aria-hidden="true"></div>
+
+        <div class="home-dashboard-section home-dashboard-section--news">
+          <header class="home-dashboard-header">
+            <h3 class="ds-h4 home-dashboard-title">News &amp; Events</h3>
+          </header>
+          <ul class="home-dashboard-list">
+            <li class="home-dashboard-news-item">
+              <span class="home-dashboard-news-date">22 May</span>
+              <span class="home-dashboard-news-title">Alpha v0.4 release notes published</span>
+            </li>
+            <li class="home-dashboard-news-item">
+              <span class="home-dashboard-news-date">18 May</span>
+              <span class="home-dashboard-news-title">Community call: Thursday 19:00 BST</span>
+            </li>
+            <li class="home-dashboard-news-item">
+              <span class="home-dashboard-news-date">14 May</span>
+              <span class="home-dashboard-news-title">New rules version v1.0 — please re-attest</span>
+            </li>
+          </ul>
+          <p class="home-dashboard-placeholder ds-small">
+            Community updates will appear here.
+          </p>
         </div>
-      {:else}
-        <!-- Existing user -->
-        <div class="home-welcome">
-          <div class="av av--lg">{ME.name[0]}</div>
-          <div>
-            <h2 class="ds-h3">Welcome back, {ME.nickname}!</h2>
-            <p class="ds-small">{REQUESTS.filter(r=>r.creator.id===ME.id&&r.status==='active').length} active requests · {OFFERS.filter(o=>o.creator.id===ME.id&&o.status==='active').length} active offers</p>
-          </div>
+      </div>
+
+      <div class="quick-cards">
+        <button class="quick-card" onclick={() => navigate('my-listings')}>
+          <span class="quick-card-icon">📋</span>
+          <span class="quick-card-label">My Requests</span>
+          <span class="quick-card-count">{REQUESTS.filter(r=>r.creator.id===ME.id).length}</span>
+        </button>
+        <button class="quick-card" onclick={() => navigate('my-listings')}>
+          <span class="quick-card-icon">🎯</span>
+          <span class="quick-card-label">My Offers</span>
+          <span class="quick-card-count">{OFFERS.filter(o=>o.creator.id===ME.id).length}</span>
+        </button>
+        <button class="quick-card" onclick={() => navigate('user-profile', ME.id)}>
+          <span class="quick-card-icon">👤</span>
+          <span class="quick-card-label">My Profile</span>
+          <span class="quick-card-count">→</span>
+        </button>
+      </div>
+
+
+      <!--
+        How Exchange Works — informational ethos block, modelled on the prod
+        R&O home. The three decorative labels (Service Types / Mutual Aid /
+        Organizations) present in prod are dropped here; they're non-interactive
+        in prod too, and the explainer paragraph does the actual work of
+        communicating the community's character.
+      -->
+      <section class="home-features">
+        <div class="home-features-explainer">
+          <h4 class="home-features-explainer-title">How Exchange Works</h4>
+          <p class="home-features-explainer-body">
+            Our community operates on <strong>mutual aid principles</strong>.
+            Members exchange skills, time, and resources based on trust and
+            reciprocity. Create requests for help, offer your services, and
+            connect directly with community members to arrange exchanges that
+            work for everyone involved.
+          </p>
         </div>
-        <div class="quick-cards">
-          <button class="quick-card" onclick={() => navigate('my-listings')}>
-            <span class="quick-card-icon">📋</span>
-            <span class="quick-card-label">My Requests</span>
-            <span class="quick-card-count">{REQUESTS.filter(r=>r.creator.id===ME.id).length}</span>
-          </button>
-          <button class="quick-card" onclick={() => navigate('my-listings')}>
-            <span class="quick-card-icon">🎯</span>
-            <span class="quick-card-label">My Offers</span>
-            <span class="quick-card-count">{OFFERS.filter(o=>o.creator.id===ME.id).length}</span>
-          </button>
-          <button class="quick-card" onclick={() => navigate('user-profile', ME.id)}>
-            <span class="quick-card-icon">👤</span>
-            <span class="quick-card-label">My Profile</span>
-            <span class="quick-card-count">→</span>
-          </button>
-        </div>
-        <div class="home-primary-actions">
-          <button class="btn-ds btn-ds--secondary" onclick={() => navigate('requests')}>📝 Browse Requests</button>
-          <button class="btn-ds btn-ds--warning"   onclick={() => navigate('offers')}>💡 Browse Offers</button>
-          <button class="btn-ds btn-ds--ghost"     onclick={() => navigate('admin')}>⚙️ Admin Panel</button>
-        </div>
-        <div class="home-community">
-          <h3 class="ds-h4">Community Resources</h3>
-          <div class="community-links">
-            <button class="community-link" onclick={() => navigate('service-types')}>🏷️ Service Types</button>
-            <button class="community-link" onclick={() => navigate('orgs')}>🏢 Organizations</button>
-            <button class="community-link" onclick={() => navigate('users')}>👥 All Users</button>
-          </div>
-        </div>
-      {/if}
+      </section>
     </div>
 
   <!-- ── BROWSE REQUESTS ── -->
@@ -2591,18 +2668,12 @@
   .cta--secondary { background: rgb(var(--color-secondary-500)); color: #111; }
   .cta--warning   { background: rgb(var(--color-warning-500));   color: #111; }
   .cta--tertiary  { background: rgb(var(--color-tertiary-500));  color: #111; }
-  .home-welcome { display: flex; align-items: center; gap: 16px; background: #fff; border: 1px solid rgb(var(--border-1)); border-radius: 16px; padding: 24px; margin-bottom: 24px; }
   .quick-cards  { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 16px; }
   .quick-card   { background: #fff; border: 1px solid rgb(var(--border-1)); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; transition: box-shadow 150ms; }
   .quick-card:hover { box-shadow: var(--shadow-md); border-color: rgb(var(--color-primary-300)); }
   .quick-card-icon  { font-size: 24px; }
   .quick-card-label { font: 600 12px/16px var(--font-base); color: rgb(var(--fg-1)); }
   .quick-card-count { font: 700 20px/24px var(--font-base); color: rgb(var(--color-primary-600)); }
-  .home-primary-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 32px; }
-  .home-community h3 { margin-bottom: 12px; }
-  .community-links { display: flex; gap: 10px; flex-wrap: wrap; }
-  .community-link { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #fff; border: 1px solid rgb(var(--border-1)); border-radius: 10px; cursor: pointer; font: 500 13px/18px var(--font-base); transition: box-shadow 100ms; }
-  .community-link:hover { box-shadow: var(--shadow-sm); border-color: rgb(var(--color-primary-300)); }
 
   /* ── Listing cards ───────────────────────────────────────────────────────── */
   .listings-grid  { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 16px; }
@@ -3467,5 +3538,174 @@
   .reattest-rules-container ul.reattest-rules-list li {
     margin: 3px 0;
     text-align: left;
+  }
+
+  /* ==========================================================================
+     Phase 4e — .banner (lifted from src/routes/ui-kit/browse-active/+page.svelte)
+     Canonical hero-banner pattern from the design system. Should eventually
+     move to a global stylesheet so every scenario shares one source of truth.
+     ========================================================================== */
+  .banner {
+    border-radius: 16px;
+    padding: 32px;
+    color: #fff;
+    box-shadow: var(--shadow-lg);
+    margin-bottom: 32px;
+    background: linear-gradient(
+      90deg,
+      rgb(var(--color-primary-500)) 0%,
+      rgb(var(--color-secondary-500)) 100%
+    );
+  }
+  .banner h2 {
+    margin: 0 0 8px;
+    font: 700 28px/34px var(--font-base);
+  }
+  .banner p {
+    margin: 0;
+    font: 400 16px/24px var(--font-base);
+    opacity: .92;
+  }
+
+  /* ==========================================================================
+     Phase 4e — home dashboard card (Recent Activity + News & Events)
+     Uses the existing .listing-card visual vocabulary; this stylesheet adds
+     only the internal two-section split.
+     ========================================================================== */
+  .home-dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    gap: 24px;
+    align-items: stretch;
+    margin: 0 0 24px 0;
+  }
+  @media (max-width: 720px) {
+    .home-dashboard {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .home-dashboard-divider {
+      display: none;
+    }
+  }
+  .home-dashboard-divider {
+    background: rgb(var(--border-1));
+  }
+  .home-dashboard-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0; /* prevent overflow from long item titles */
+  }
+  .home-dashboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 4px 0;
+  }
+  .home-dashboard-title {
+    margin: 0;
+    font-size: 15px;
+    color: rgb(var(--fg-1));
+  }
+  .home-dashboard-link {
+    background: none;
+    border: none;
+    color: rgb(var(--fg-3));
+    font: 500 12px/1 var(--font-base);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 6px;
+  }
+  .home-dashboard-link:hover {
+    color: rgb(var(--fg-1));
+    background: rgb(var(--bg-muted));
+  }
+
+  .home-dashboard-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .home-dashboard-item {
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 6px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    font: 400 14px/1.3 var(--font-base);
+    color: rgb(var(--fg-1));
+  }
+  .home-dashboard-item:hover {
+    background: rgb(var(--bg-muted));
+  }
+  .home-dashboard-item-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .home-dashboard-item-meta {
+    font-size: 12px;
+    color: rgb(var(--fg-3));
+  }
+
+  .home-dashboard-news-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 6px 8px;
+  }
+  .home-dashboard-news-date {
+    font: 600 11px/1 var(--font-base);
+    color: rgb(var(--color-primary-700));
+    min-width: 48px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .home-dashboard-news-title {
+    font: 500 14px/1.3 var(--font-base);
+    color: rgb(var(--fg-1));
+  }
+  .home-dashboard-placeholder {
+    margin: 8px 0 0 0;
+    color: rgb(var(--fg-3));
+    font-style: italic;
+    text-align: center;
+  }
+
+  /* ==========================================================================
+     Phase 4e — Community Features block (matches prod R&O home structure)
+     ========================================================================== */
+  .home-features {
+    margin-top: -4px; /* tighten the gap from the quick-cards row above */
+  }
+  .home-features-explainer {
+    background: rgb(var(--color-primary-50));
+    border: 1px solid rgb(var(--color-primary-200));
+    border-radius: 10px;
+    padding: 16px;
+    text-align: left;
+  }
+  .home-features-explainer-title {
+    margin: 0 0 8px 0;
+    font: 600 14px/1.3 var(--font-base);
+    color: rgb(var(--color-primary-800));
+  }
+  .home-features-explainer-body {
+    margin: 0;
+    font: 400 13px/1.5 var(--font-base);
+    color: rgb(var(--color-primary-700));
+  }
+  .home-features-explainer-body strong {
+    color: rgb(var(--color-primary-800));
   }
 </style>
