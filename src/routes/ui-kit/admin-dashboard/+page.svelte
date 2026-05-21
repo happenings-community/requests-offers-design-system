@@ -22,6 +22,87 @@
     { key: 'admin-offers',         label: 'Offers',              ic: '💡' },
     { key: 'admin-administrators', label: 'Administrators',      ic: '🛡️' },
   ];
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Moderation Queue tabs — three tabs, prod-aligned (counts in labels).
+  // ─────────────────────────────────────────────────────────────────────────
+  type ModerationTab = 'pending-users' | 'pending-orgs' | 'member-migrations';
+  let moderationTab = $state<ModerationTab>('pending-users');
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Member Migrations — generic primitive for retroactively transforming DHT
+  // entries when architecture evolves. The button label and section heading
+  // are deliberately named after the PRIMITIVE ("Run Member Migration") and
+  // never after the specific migration; new schema migrations get added as
+  // new rows in this table without UI changes.
+  //
+  // First concrete instance: Pre-Lobby Back-Propagation — synthesises
+  // LobbyOrigin records for members who joined before the lobby DHT existed.
+  // Pre-lobby records have provenance="pre-lobby" and null membraneProofHash
+  // / lobbyAgentPubKey.
+  //
+  // Completed migrations stay visible in the list with a ✓ Completed tag,
+  // matching prod's "show what's done" philosophy for one-shot architectural
+  // events (in contrast to user approvals, which disappear on action).
+  // ─────────────────────────────────────────────────────────────────────────
+  type MigrationStatus = 'idle' | 'running' | 'completed';
+  type Migration = {
+    id: string;
+    name: string;
+    description: string;
+    total: number;
+    processed: number;
+    lastRun: string | null;
+    status: MigrationStatus;
+  };
+
+  let migrations = $state<Migration[]>([
+    {
+      id: 'pre-lobby-back-propagation',
+      name: 'Pre-Lobby Back-Propagation',
+      description:
+        'Synthesise LobbyOrigin records for members who joined before the ' +
+        'lobby DHT existed. Pre-lobby records carry provenance="pre-lobby" ' +
+        'and null membraneProofHash / lobbyAgentPubKey.',
+      total: 12,
+      processed: 7,
+      lastRun: '2 hours ago',
+      status: 'idle'
+    }
+  ]);
+
+  const activeMigrationCount = $derived(
+    migrations.filter(m => m.status !== 'completed').length
+  );
+
+  async function runMigration(id: string): Promise<void> {
+    const idx = migrations.findIndex(m => m.id === id);
+    if (idx === -1) return;
+    if (migrations[idx].status === 'running') return;
+
+    // MOCK: in production this would invoke a coordinator zome call to step
+    // the migration forward by a batch. Here we tick the processed count by
+    // a ~9% slice of total per click, with a 1s spinner to convey work.
+    migrations[idx].status = 'running';
+    await new Promise((r) => setTimeout(r, 1000));
+
+    const step = Math.max(1, Math.ceil(migrations[idx].total * 0.09));
+    migrations[idx].processed = Math.min(
+      migrations[idx].total,
+      migrations[idx].processed + step
+    );
+    migrations[idx].lastRun = 'just now';
+
+    if (migrations[idx].processed >= migrations[idx].total) {
+      migrations[idx].status = 'completed';
+    } else {
+      migrations[idx].status = 'idle';
+    }
+  }
+
+  function migrationPercent(m: Migration): number {
+    return Math.round((m.processed / m.total) * 100);
+  }
 </script>
 
 <div class="admin-layout">
@@ -69,25 +150,91 @@
         <ds-chip tone="warning">2 Pending</ds-chip>
       </div>
       <div class="queue-tabs">
-        <button class="tab tab--active">Pending Users</button>
-        <button class="tab">Pending Orgs</button>
+        <button
+          class="tab {moderationTab === 'pending-users' ? 'tab--active' : ''}"
+          onclick={() => moderationTab = 'pending-users'}
+        >Pending Users ({pendingUsers.length})</button>
+        <button
+          class="tab {moderationTab === 'pending-orgs' ? 'tab--active' : ''}"
+          onclick={() => moderationTab = 'pending-orgs'}
+        >Pending Orgs (0)</button>
+        <button
+          class="tab {moderationTab === 'member-migrations' ? 'tab--active' : ''}"
+          onclick={() => moderationTab = 'member-migrations'}
+        >Member Migrations ({activeMigrationCount})</button>
       </div>
-      <div class="queue-list">
-        {#each pendingUsers as user}
-          <div class="queue-row">
-            <div class="user-avatar">{user.initial}</div>
-            <div class="user-info">
-              <div class="user-name">{user.name}</div>
-              <div class="user-meta">{user.location} · Joined {user.joined}</div>
+
+      {#if moderationTab === 'pending-users'}
+        <div class="queue-list">
+          {#each pendingUsers as user}
+            <div class="queue-row">
+              <div class="user-avatar">{user.initial}</div>
+              <div class="user-info">
+                <div class="user-name">{user.name}</div>
+                <div class="user-meta">{user.location} · Joined {user.joined}</div>
+              </div>
+              <div class="queue-actions">
+                <ds-button variant="ghost" size="sm">View</ds-button>
+                <ds-button variant="error" size="sm">Reject</ds-button>
+                <ds-button variant="primary" size="sm">Approve</ds-button>
+              </div>
             </div>
-            <div class="queue-actions">
-              <ds-button variant="ghost" size="sm">View</ds-button>
-              <ds-button variant="error" size="sm">Reject</ds-button>
-              <ds-button variant="primary" size="sm">Approve</ds-button>
-            </div>
-          </div>
-        {/each}
-      </div>
+          {/each}
+        </div>
+
+      {:else if moderationTab === 'pending-orgs'}
+        <p class="queue-empty">No pending organisations.</p>
+
+      {:else if moderationTab === 'member-migrations'}
+        <!--
+          Member Migrations primitive — generic schema-migration UI for DHT
+          entries. All migrations stay visible regardless of status; completed
+          ones carry a ✓ Completed badge. One-shot architectural events stay
+          in the list as a record-of-fact rather than disappearing (unlike
+          user approvals, which vanish on action).
+        -->
+        <div class="migration-list">
+          {#each migrations as m (m.id)}
+            <article
+              class="migration-row"
+              class:migration-row--completed={m.status === 'completed'}
+            >
+              <header class="migration-head">
+                <div>
+                  <h4 class="migration-name">{m.name}</h4>
+                  <p class="migration-desc">{m.description}</p>
+                </div>
+                {#if m.status === 'completed'}
+                  <span class="migration-done-tag">✓ Completed</span>
+                {:else}
+                  <button
+                    class="migration-run"
+                    disabled={m.status === 'running'}
+                    onclick={() => runMigration(m.id)}
+                  >
+                    {#if m.status === 'running'}⏳ Running…{:else}▶ Run Member Migration{/if}
+                  </button>
+                {/if}
+              </header>
+
+              <div class="migration-progress">
+                <div class="migration-progress-bar">
+                  <div
+                    class="migration-progress-fill"
+                    style="width: {migrationPercent(m)}%"
+                  ></div>
+                </div>
+                <span class="migration-progress-text">
+                  {migrationPercent(m)}% ({m.processed} of {m.total})
+                </span>
+              </div>
+              <p class="migration-meta">
+                Last run: {m.lastRun ?? 'never'}
+              </p>
+            </article>
+          {/each}
+        </div>
+      {/if}
     </section>
   </main>
 </div>
@@ -147,4 +294,106 @@
   .user-name { font: 600 14px/20px var(--font-base); color: #fff; }
   .user-meta { font: 400 12px/16px var(--font-base); color: rgba(255,255,255,.5); }
   .queue-actions { display: flex; gap: 6px; }
+  .queue-empty {
+    margin: 0;
+    padding: 24px 12px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+    font: 400 13px/18px var(--font-base);
+  }
+
+  /* ── Member Migrations ──────────────────────────────────────────────── */
+  .migration-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .migration-row {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .migration-row--completed {
+    opacity: 0.75;
+  }
+  .migration-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .migration-name {
+    margin: 0;
+    font: 600 15px/20px var(--font-base);
+    color: #fff;
+  }
+  .migration-desc {
+    margin: 4px 0 0 0;
+    font: 400 12px/18px var(--font-base);
+    color: rgba(255, 255, 255, 0.55);
+    max-width: 540px;
+  }
+  .migration-run {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid rgb(var(--color-primary-500));
+    background: rgb(var(--color-primary-500));
+    color: #fff;
+    font: 600 13px/18px var(--font-base);
+    cursor: pointer;
+    transition: background 100ms, border-color 100ms;
+  }
+  .migration-run:hover:not(:disabled) {
+    background: rgb(var(--color-primary-600));
+    border-color: rgb(var(--color-primary-600));
+  }
+  .migration-run:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  .migration-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .migration-progress-bar {
+    flex: 1;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+  .migration-progress-fill {
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      rgb(var(--color-primary-500)) 0%,
+      rgb(var(--color-secondary-500)) 100%
+    );
+    transition: width 400ms ease;
+  }
+  .migration-progress-text {
+    font: 600 12px/16px var(--font-base);
+    color: #fff;
+    min-width: 110px;
+    text-align: right;
+  }
+  .migration-meta {
+    margin: 0;
+    font: 400 11px/16px var(--font-base);
+    color: rgba(255, 255, 255, 0.4);
+  }
+  .migration-done-tag {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(34, 197, 94, 0.15);
+    color: rgb(74, 222, 128);
+    font: 600 12px/16px var(--font-base);
+  }
 </style>
