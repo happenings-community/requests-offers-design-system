@@ -190,6 +190,228 @@
   function addLink(links: string[], inp: string): [string[], string] {
     return inp.trim() ? [[...links, inp.trim()], ''] : [links, inp];
   }
+
+  // ── Joining flow composable (Layer 0/1) ────────────────────────────────────
+  // Wave 1 of Phase 4d. Drives routing through the joining lifecycle.
+  // See src/lib/guards/useJoiningGuard.svelte.ts for the joining-service flow (hc_auth_approval).
+  import { useJoiningGuard, type JoiningStatus } from '$lib/guards/useJoiningGuard.svelte';
+
+  const joining = useJoiningGuard();
+
+  // Route on status TRANSITIONS, not on the present state of status. The
+  // composable owns "what state are you in"; the user owns "what screen am
+  // I looking at within that state". Earlier wiring re-routed every time the
+  // user navigated, which fought against in-state navigation (e.g. clicking
+  // "Join the community" on join-welcome while status stays unauthenticated).
+  //
+  // Initial mount: route once to whatever the composable says, then track
+  // transitions from there.
+  let lastJoiningStatus = $state<JoiningStatus | null>(null);
+  $effect(() => {
+    if (lastJoiningStatus === null) {
+      // First mount — route to the composable's initial nextRoute.
+      lastJoiningStatus = joining.status;
+      if (joining.nextRoute !== route) navigate(joining.nextRoute);
+      return;
+    }
+    if (joining.status !== lastJoiningStatus) {
+      lastJoiningStatus = joining.status;
+      if (joining.nextRoute !== route) navigate(joining.nextRoute);
+    }
+  });
+
+  // Join-form state (mirrors p* naming from existing user-create form)
+  let jGivenName  = $state('');
+  let jFamilyName = $state('');
+  let jIsMononym  = $derived(jFamilyName.trim() === '' || jFamilyName.trim() === '.');
+  let jNickname   = $state('');
+  let jEmail      = $state('');
+  let jUserType   = $state<'advocate' | 'creator'>('advocate');
+  let jReason     = $state('');
+
+  // Password-gate state
+  let pgEmail     = $state('');
+  let pgPassword  = $state('');
+
+  // Demo-control panel state — always-visible bottom-right
+  // Lets the show-and-tell jump between the eleven JoiningStatus values
+  // without walking the happy path each time.
+  let demoStatus = $state<JoiningStatus>('unauthenticated');
+  function setDemoStatus(s: JoiningStatus) {
+    demoStatus = s;
+    joining.__setStatusForDemo(s);
+  }
+
+  // ── Wave 2 screen handlers ────────────────────────────────────────────────
+
+  // join-form submit — POST /v1/join with agent_key + claims (joining-service in real impl).
+  // Required fields (marked * in UI): x_given_name, x_nickname, email, x_user_type.
+  // Family name is optional iff mononym (handled via "." sentinel on submit).
+  // x_introduction is optional in the spec.
+  let jCanSubmit = $derived(
+    jGivenName.trim() !== '' &&
+    jNickname.trim() !== '' &&
+    jEmail.trim() !== '' &&
+    jEmail.includes('@') &&
+    jEmail.length > 3
+  );
+
+  // List which required fields are missing — surfaced as a banner once the
+  // user has begun engaging with the form.
+  let jMissingFields = $derived.by(() => {
+    const missing: string[] = [];
+    if (jGivenName.trim() === '') missing.push('Given Name');
+    if (jNickname.trim() === '') missing.push('Nickname');
+    if (jEmail.trim() === '') missing.push('Email Address');
+    else if (!jEmail.includes('@') || jEmail.length <= 3) missing.push('a valid Email Address');
+    return missing;
+  });
+  // Form is "touched" once any field has had content.
+  let jTouched = $derived(
+    jGivenName !== '' || jFamilyName !== '' || jNickname !== '' ||
+    jEmail !== '' || jReason !== ''
+  );
+
+  async function handleJoinFormSubmit() {
+    if (!jCanSubmit) return;
+    await joining.submitJoinRequest({
+      email: jEmail,
+      x_given_name: jGivenName,
+      x_family_name: jFamilyName.trim() === '' ? '.' : jFamilyName,
+      x_nickname: jNickname,
+      x_user_type: jUserType,
+      x_introduction: jReason,
+    });
+    // $effect auto-routes to join-pending on join-pending status.
+  }
+
+  // join-set-password fields. Confirm field prevents typos becoming
+  // unrecoverable; matches PasswordSchema's likely "8 chars minimum".
+  // Recent Activity feed — interleaved merge of REQUESTS and OFFERS for the
+  // home dashboard. Mock items have no timestamp field, so 'recency' is
+  // implicit-by-array-position (matching the existing OFFERS.slice / .slice
+  // patterns used elsewhere in this mockup). In production this would come
+  // from a Holochain query against the member's source chain links + DHT
+  // recent-activity index, sorted by commit timestamp.
+  const RECENT_ACTIVITY: Array<{
+    kind: 'request' | 'offer';
+    id: string;
+    title: string;
+    creator: User;
+  }> = [
+    ...REQUESTS.map(r => ({ kind: 'request' as const, id: r.id, title: r.title, creator: r.creator })),
+    ...OFFERS.map(o   => ({ kind: 'offer'   as const, id: o.id, title: o.title, creator: o.creator }))
+  ];
+
+  let pwSet = $state('');
+  let pwSetConfirm = $state('');
+  let pwSetShow = $state(false);
+  let pwSetError = $derived.by(() => {
+    if (!pwSet) return null;
+    if (pwSet.length < 8) return 'Password must be at least 8 characters.';
+    if (pwSetConfirm && pwSet !== pwSetConfirm) return 'Passwords do not match.';
+    return null;
+  });
+  // Mock flag: in real impl this comes from Kangaroo config (passwordMode).
+  // Toggled here to false to demo the skip-block; flip during architecture review.
+  const passwordModeOptional = true;
+
+  async function handleSetPassword() {
+    if (pwSetError || !pwSet || pwSet !== pwSetConfirm) return;
+    await joining.setInstancePassword(pwSet);
+    if (joining.status === 'authenticated' && !joining.error) {
+      navigate('home');
+    }
+  }
+
+  async function handleSkipPassword() {
+    await joining.skipInstancePassword();
+    if (joining.status === 'authenticated' && !joining.error) {
+      navigate('home');
+    }
+  }
+
+  // password-gate
+  let pgShow = $state(false);
+  let pgForgottenOpen = $state(false);
+
+  async function handleUnlock() {
+    await joining.unlockInstance(pgEmail, pgPassword);
+    if (joining.status === 'authenticated' && !joining.error) {
+      navigate('home');
+    } else {
+      // Failed unlock — clear password field, keep email, let user retry.
+      pgPassword = '';
+    }
+  }
+
+  // rules-reattestation
+  let reattestHasScrolled = $state(false);
+  let reattestAccepted    = $state(false);
+
+  function reattestOnScroll(e: Event) {
+    const el = e.currentTarget as HTMLElement;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 8) {
+      reattestHasScrolled = true;
+    }
+  }
+
+  async function handleSignAndContinue() {
+    if (!reattestHasScrolled || !reattestAccepted) return;
+    await joining.attestCurrentRules();
+    if (joining.status === 'authenticated' && !joining.error) {
+      // Reset local state so the screen is clean if revisited via demo controls.
+      reattestHasScrolled = false;
+      reattestAccepted = false;
+      navigate('home');
+    }
+  }
+
+  // join-approved (provisioning: fetch membrane proof + community-agreements attestation)
+  let approveHasScrolled = $state(false);
+  let approveAccepted    = $state(false);
+
+  function approveOnScroll(e: Event) {
+    const el = e.currentTarget as HTMLElement;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 8) {
+      approveHasScrolled = true;
+    }
+  }
+
+  async function handleSignAndJoin() {
+    if (!approveHasScrolled || !approveAccepted) return;
+    await joining.fetchProvision();
+    // On success: composable transitions to 'binding-needs-password' and the
+    // route-on-transition $effect auto-routes to 'join-set-password'.
+    // On failure: composable returns to 'join-ready' with joining.error set;
+    // the screen recalls naturally and shows the error block.
+    // No explicit navigate() needed here.
+  }
+
+  // Demo-only: flip between temporary and indefinite suspension on member-suspended
+  // so the show-and-tell can see both conditional renderings without re-routing.
+  function setSuspensionForDemo(kind: 'temporary' | 'indefinite') {
+    if (kind === 'temporary') {
+      joining.__setStatusForDemo('member-suspended', {
+        memberStatus: {
+          status_type: 'suspended temporarily',
+          reason: 'Sustained disruption of discussion across multiple threads.',
+          suspended_until: '2026-06-15T00:00:00Z',
+          created_at: Date.parse('2026-05-18T14:30:00Z'),
+          updated_at: Date.parse('2026-05-18T14:30:00Z'),
+        }
+      });
+    } else {
+      joining.__setStatusForDemo('member-suspended', {
+        memberStatus: {
+          status_type: 'suspended indefinitely',
+          reason: 'Pattern of behaviour incompatible with the community agreements.',
+          created_at: Date.parse('2026-05-18T14:30:00Z'),
+          updated_at: Date.parse('2026-05-18T14:30:00Z'),
+        }
+      });
+    }
+  }
 </script>
 
 <!-- ══════════════════════════════════════════════════════════
@@ -446,76 +668,1024 @@
 {:else}
 <ds-shell route={route} app-name="Requests & Offers" logo-src="/assets/hAppeningsCIClogo.png">
 
-  <!-- ── HOME ── -->
-  {#if route === 'home'}
+  <!-- ══════════════════════════════════════════════════════════
+       SHARED SNIPPETS
+       ══════════════════════════════════════════════════════════ -->
+
+  {#snippet scoreboard()}
+    <!--
+      Scoreboard surface for unauthenticated (join-welcome) and post-application
+      (join-pending) audiences. NEW CONTENT requested by Anita; not part of
+      Sacha's existing design-system primitives. Final content (which listings
+      to surface, count semantics, tone) to be defined by Anita; current
+      numbers are realistic mock placeholders for the Alpha 0.5.1 community.
+    -->
+    <div class="scoreboard">
+      <p class="ds-small scoreboard-summary">
+        <strong>12</strong> listings · <strong>24</strong> members · <strong>8</strong> exchanges
+      </p>
+      <div class="scoreboard-cols">
+        <div class="scoreboard-col scoreboard-col--requests">
+          <h4 class="ds-h4 scoreboard-col-title">Latest Requests</h4>
+          {#each REQUESTS.slice(0, 2) as r (r.id)}
+            <button class="scoreboard-item" onclick={() => navigate('request-detail', r.id)}>
+              <span class="scoreboard-item-icon">📝</span>
+              <div class="scoreboard-item-body">
+                <p class="scoreboard-item-title">{r.title}</p>
+                <p class="ds-small scoreboard-item-meta">by {r.creator.name}</p>
+              </div>
+            </button>
+          {/each}
+        </div>
+        <div class="scoreboard-col scoreboard-col--offers">
+          <h4 class="ds-h4 scoreboard-col-title">Recent Offers</h4>
+          {#each OFFERS.slice(0, 2) as o (o.id)}
+            <button class="scoreboard-item" onclick={() => navigate('offer-detail', o.id)}>
+              <span class="scoreboard-item-icon">💡</span>
+              <div class="scoreboard-item-body">
+                <p class="scoreboard-item-title">{o.title}</p>
+                <p class="ds-small scoreboard-item-meta">by {o.creator.name}</p>
+              </div>
+            </button>
+          {/each}
+        </div>
+      </div>
+    </div>
+  {/snippet}
+
+  <!-- ══════════════════════════════════════════════════════════
+       JOINING FLOW + MEMBRANE GATES
+       Wave 1: access-issue, join-welcome, join-pending, join-rejected
+       ══════════════════════════════════════════════════════════ -->
+
+  <!-- ── ACCESS ISSUE ── graceful degradation for JoiningStatus="unknown" ── -->
+  {#if route === 'access-issue'}
+    <div class="centered-screen">
+      <div class="join-card">
+        <h1 class="ds-h2">Something is not quite right</h1>
+        <p class="ds-p">We could not determine your access status. This is usually a transient issue — please try again.</p>
+        {#if joining.error}
+          <p class="ds-small join-error">{joining.error}</p>
+        {/if}
+        <div class="join-actions">
+          <button class="btn-ds btn-ds--primary" onclick={() => joining.retry()}>↺ Try again</button>
+        </div>
+      </div>
+    </div>
+
+  <!-- ── JOIN WELCOME ── public, unauthenticated landing ── -->
+  {:else if route === 'join-welcome'}
+    <div class="join-page">
+      <div class="join-hero">
+        <h1 class="ds-h1">Welcome to Requests &amp; Offers</h1>
+        <h2 class="ds-h2 join-subhead">Holochain Ecosystem</h2>
+        <p class="ds-p join-tagline">Connect and exchange with other Advocates and Creators in <em>our</em> community!</p>
+        <p class="ds-p join-body">Requests &amp; Offers is a mutual-aid hApp for the Holochain community. Browse the public listings — see what people are offering, what they are asking for — and join when you are ready to participate.</p>
+        <div class="join-actions">
+          <button class="btn-ds btn-ds--primary" onclick={() => navigate('join-form')}>✨ Join the community</button>
+        </div>
+      </div>
+
+      {@render scoreboard()}
+
+      <p class="ds-small join-footer">
+        Joining is a welcomed entry, not signup. You will hear back from us within 48 hours.
+        If you would like to connect with us please email:
+        <a href="mailto:info@happenings.community">info@happenings.community</a>
+      </p>
+    </div>
+
+  <!-- ── JOIN PENDING ── post-application, awaiting admin review ── -->
+  {:else if route === 'join-pending'}
+    <div class="join-page">
+      <div class="join-hero">
+        <h1 class="ds-h1">Welcome to Requests &amp; Offers</h1>
+        <h2 class="ds-h2 join-subhead">Holochain Ecosystem</h2>
+        <h2 class="ds-h3 join-pending-status">Application sent</h2>
+        <p class="ds-p">
+          Your application will be reviewed in the next 48 hours. Keep an eye on your email
+          inbox at <strong>{joining.claimsData?.email ?? 'the address you provided'}</strong>
+          — we will let you know there when you can join the Requests &amp; Offers — Holochain Ecosystem network.
+        </p>
+      </div>
+
+      {@render scoreboard()}
+
+      <p class="ds-small join-footer">
+        You can safely close this page. Your application is saved — no need to reapply.
+        Joining is a welcomed entry, not signup. You will hear back from us within 48 hours.
+        If you would like to connect with us please email:
+        <a href="mailto:info@happenings.community">info@happenings.community</a>
+      </p>
+    </div>
+
+  <!-- ── JOIN REJECTED ── application not approved ── -->
+  {:else if route === 'join-rejected'}
+    <div class="centered-screen">
+      <div class="join-card">
+        <h1 class="ds-h2">We were not able to welcome you at this time</h1>
+        <p class="ds-p">
+          We are currently running a closed Alpha test, and not everyone who applies can be
+          included in this round. This is a constraint of where we are in the project.
+        </p>
+        <p class="ds-p">
+          Keep an eye on our "What's hAppening?" Newsletter where we will announce the next
+          round of testing. Thanks for applying.
+        </p>
+        <p class="ds-p join-body">
+          If this feels wrong, or if you would like to be considered for the next round,
+          reach out to us at <a href="mailto:info@happenings.community">info@happenings.community</a>
+          and one of the team will be in touch.
+        </p>
+        <div class="join-actions">
+          <a class="btn-ds btn-ds--primary" href="mailto:info@happenings.community">✉️ Email info@happenings.community</a>
+        </div>
+      </div>
+    </div>
+
+  <!-- ── JOIN APPROVED ── join-ready + provisioning; agreements + provision ── -->
+  {:else if route === 'join-approved'}
+    <div class="centered-screen">
+      <div class="join-card join-card--wide">
+        <h1 class="ds-h2 approve-heading">You are in. Welcome aboard.</h1>
+        <div class="approve-subhead-emoji" aria-hidden="true">🤝</div>
+        <p class="approve-subhead">Glad to have you here.</p>
+
+        <ol class="approve-welcome-list">
+          <li>
+            <span class="approve-welcome-lead">Look around.</span>
+            See what other Creators and Advocates are offering and asking for —
+            your community is already in motion.
+          </li>
+          <li>
+            <span class="approve-welcome-lead">Set up your profile.</span>
+            We have kept what you told us — your name, email, and a starting
+            bio are ready for you to review and expand.
+          </li>
+          <li>
+            <span class="approve-welcome-lead">Post your first listing.</span>
+            Whether it is a skill you can Offer or a Request for collaboration
+            — both move the community.
+          </li>
+        </ol>
+
+        <div class="approve-agreements-section">
+          <p class="ds-p approve-agreements-intro approve-agreements-intro--bold">
+            Before you join, please read our community agreements. These are
+            the commitments we make to each other as a community. By joining,
+            you commit to these community agreements as part of
+            becoming a member.
+          </p>
+
+          <div
+            class="reattest-rules-container"
+            class:reattest-rules-container--unread={!approveHasScrolled}
+            onscroll={approveOnScroll}
+            tabindex="0"
+            role="region"
+            aria-label="Community agreements"
+          >
+            <h2 class="ds-h3 reattest-rules-heading">Personal Responsibilities</h2>
+            <p class="ds-p">
+              The hAppenings.community collectively strives to foster an
+              increasingly open, inclusive and caring culture.
+            </p>
+            <p class="ds-p">
+              As community participants it is our responsibility to inhabit by
+              these Personal Conduct Guidelines to build a warm and welcoming
+              environment for us all:
+            </p>
+
+            <h3 class="ds-h4 reattest-rules-subheading">Respect diversity</h3>
+            <p class="ds-p">
+              We are committed to supporting social diversity and cultural
+              sensitivity. Please support our conduct standards in all
+              interactions.
+            </p>
+
+            <h3 class="ds-h4 reattest-rules-subheading">Communicate gently</h3>
+            <p class="ds-p">
+              Participants are expected to support contemplative awareness and
+              nonviolent communication in our relationships. This is especially
+              important in online communications. Please consider other
+              perspectives in your interactions.
+            </p>
+
+            <h3 class="ds-h4 reattest-rules-subheading">Communicate effectively</h3>
+            <p class="ds-p">
+              Your voice is welcome. Your perspective is valued. Your interests
+              are interesting. The best thing you can do to give and receive
+              value is participate. Please consider the intended purpose of
+              different communication channels within our community and choose
+              the appropriate channel for different interactions.
+            </p>
+
+            <h3 class="ds-h4 reattest-rules-subheading">Discuss concerns and questions</h3>
+            <p class="ds-p">
+              If you feel uncomfortable or uncertain about our issues or
+              processes, please identify your concerns. You can do this
+              publicly, or privately by contacting one of the community admins
+              or via email to
+              <a href="mailto:info@happenings.community">info@happenings.community</a>.
+            </p>
+
+            <h3 class="ds-h4 reattest-rules-subheading">Resolve conflicts inclusively</h3>
+            <p class="ds-p">
+              We commit to resolve conflicts inclusively using a Transformative
+              Justice approach, aiming to strengthen community and to fairly
+              recognise all serious concerns. We encourage all conflicts to be
+              resolved with the fewest people necessary, again acknowledging
+              that everyone directly affected by the conflict needs to be
+              involved.
+            </p>
+
+            <h3 class="ds-h4 reattest-rules-subheading">Mutual responsibility</h3>
+            <p class="ds-p">
+              We're all responsible, all of the time, to take positive action
+              in response to harassment and abuse. In some instances, this may
+              include reporting to external authorities. Our community expects
+              all participants to take this responsibility seriously.
+            </p>
+
+            <h2 class="ds-h3 reattest-rules-heading">Our Standards</h2>
+            <p class="ds-p">
+              hAppenings.community is dedicated to providing a harassment-free
+              experience for everyone. We do not tolerate harassment of
+              participants in any form.
+            </p>
+            <p class="ds-p">
+              Participants are responsible for knowing and abiding by these
+              rules.
+            </p>
+
+            <p class="ds-p">Harassment includes:</p>
+
+            <h4 class="ds-small reattest-rules-group-heading">Communication and language</h4>
+            <ul class="reattest-rules-list">
+              <li>
+                Offensive comments related to gender, gender identity and
+                expression, sexual orientation, disability, mental illness,
+                neuro(a)typicality, physical appearance, body size, age, race,
+                class, or religion.
+              </li>
+              <li>
+                Unwelcome comments regarding a person's lifestyle choices and
+                practices, including those related to food, health, parenting,
+                drugs, and employment.
+              </li>
+              <li>Deliberate misgendering or use of 'dead' or rejected names.</li>
+            </ul>
+
+            <h4 class="ds-small reattest-rules-group-heading">Threats and disruption</h4>
+            <ul class="reattest-rules-list">
+              <li>Threats of violence.</li>
+              <li>
+                Incitement of violence towards any individual, including
+                encouraging a person to commit suicide or to engage in
+                self-harm.
+              </li>
+              <li>Stalking or following.</li>
+              <li>Sustained disruption of discussion.</li>
+            </ul>
+
+            <h4 class="ds-small reattest-rules-group-heading">Sexual content and unwelcome contact</h4>
+            <ul class="reattest-rules-list">
+              <li>
+                Sexual images or behaviour — not appropriate in the
+                Requests &amp; Offers Holochain ecosystem.
+              </li>
+              <li>Unwelcome sexual attention.</li>
+              <li>
+                Pattern of inappropriate social contact, such as requesting or
+                assuming inappropriate levels of intimacy with others.
+              </li>
+              <li>Continued one-on-one communication after requests to cease.</li>
+            </ul>
+
+            <h4 class="ds-small reattest-rules-group-heading">Privacy</h4>
+            <ul class="reattest-rules-list">
+              <li>
+                Deliberate "outing" of any aspect of a person's identity
+                without their consent except as necessary to protect
+                vulnerable people from intentional abuse.
+              </li>
+              <li>
+                Surveilling another participant's activity — for example
+                screenshotting their messages or listings, or compiling logs
+                of their behaviour for harassment purposes.
+              </li>
+              <li>Publication of private communication.</li>
+            </ul>
+          </div>
+
+          {#if !approveHasScrolled}
+            <p class="ds-small reattest-scroll-hint">
+              Please read to the end before agreeing.
+            </p>
+          {/if}
+
+          <label class="reattest-checkbox-row">
+            <input
+              type="checkbox"
+              class="ds-checkbox"
+              bind:checked={approveAccepted}
+              disabled={!approveHasScrolled || joining.isLoading}
+            />
+            <span
+              class="reattest-checkbox-label"
+              class:reattest-checkbox-label--disabled={!approveHasScrolled}
+            >
+              I have read the community agreements above and I commit to
+              participate accordingly.
+            </span>
+          </label>
+        </div>
+
+        {#if joining.error}
+          <p class="ds-small join-error">{joining.error}</p>
+        {/if}
+
+        <div class="join-actions">
+          <button
+            type="button"
+            class="btn-ds btn-ds--primary"
+            disabled={!approveHasScrolled || !approveAccepted || joining.isLoading}
+            onclick={handleSignAndJoin}
+          >
+            {#if joining.isLoading}
+              ⏳ Setting up your access…
+            {:else}
+              ✍️ Sign and join Requests &amp; Offers
+            {/if}
+          </button>
+        </div>
+
+        <p class="ds-small approve-closing">
+          Mutual aid works when people show up for each other — thanks for joining.
+        </p>
+      </div>
+    </div>
+
+  <!-- ── JOIN FORM ── claims form (POST /v1/join payload) ── -->
+  {:else if route === 'join-form'}
+    <div class="join-form-page">
+      <div class="join-form-nav">
+        <button class="btn-ghost" onclick={() => navigate('join-welcome')}>← Back</button>
+      </div>
+      <h1 class="ds-h2 join-form-title">Apply to join</h1>
+      <p class="ds-p join-form-intro">
+        Hello! We are on the second round of our Alpha Test for Requests &amp; Offers — a mutual-aid app powered by Holochain.
+        Tell us a bit about yourself and an admin will be in touch soon.
+      </p>
+      <form class="form-card join-form-card" onsubmit={(e) => e.preventDefault()}>
+        <p class="ds-small form-note">* required fields</p>
+
+        <div class="form-row-2">
+          <div class="field">
+            <label class="field-label">Given Name *</label>
+            <input class="ds-input" bind:value={jGivenName} placeholder="e.g. Sam"/>
+            <span class="field-hint">Use your real name, it helps trust develop in our mutual aid networks. Once approved your name cannot be changed.</span>
+          </div>
+          <div class="field">
+            <label class="field-label">Family Name{jIsMononym ? '' : ' *'}</label>
+            <input class="ds-input" bind:value={jFamilyName} placeholder={jIsMononym ? '(mononymous)' : 'e.g. Turner'}/>
+            <span class="field-hint">Leave blank or enter "." if you are mononymous.</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Nickname *</label>
+          <input class="ds-input" bind:value={jNickname} placeholder="@handle"/>
+          <span class="field-hint">Share a nickname you might use within the ecosystem. It can be changed at a later date.</span>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Email Address *</label>
+          <input type="email" class="ds-input" bind:value={jEmail} placeholder="you@example.com"/>
+          <span class="field-hint">We will use this to let you know when your application is reviewed.</span>
+        </div>
+
+        <div class="form-card-section">
+          <label class="field-label">I am joining as *</label>
+          <div class="radio-group">
+            <label class="radio-opt">
+              <input type="radio" name="j-type" value="advocate" bind:group={jUserType}/>
+              <span><strong>A Holochain Advocate</strong> — a contributor (regardless of technical ability) who wants to support the broader vision of Holochain and Holo.</span>
+            </label>
+            <label class="radio-opt">
+              <input type="radio" name="j-type" value="creator" bind:group={jUserType}/>
+              <span><strong>A Creator</strong> — an individual developer, designer, etc. and/or someone who wants to build on their ideas to create Holochain applications, developer tools, libraries / zomes and other Holochain projects.</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">What brings you here?</label>
+          <textarea class="ds-input" rows="4" bind:value={jReason} placeholder="Let us know why you would like to participate in Requests and Offers!"></textarea>
+        </div>
+
+        {#if joining.error}
+          <p class="ds-small join-error">{joining.error}</p>
+        {/if}
+
+        {#if jTouched && jMissingFields.length > 0}
+          <p class="ds-small form-missing-hint">
+            Still needed: {jMissingFields.join(', ')}
+          </p>
+        {/if}
+
+        <div class="form-actions">
+          <button type="button" class="btn-ghost" onclick={() => navigate('join-welcome')}>Cancel</button>
+          <button
+            type="button"
+            class="btn-ds btn-ds--primary"
+            class:btn-ds--disabled={!jCanSubmit}
+            disabled={!jCanSubmit}
+            onclick={handleJoinFormSubmit}
+          >
+            ✨ Submit application
+          </button>
+        </div>
+      </form>
+    </div>
+
+  <!-- ── JOIN SET PASSWORD ── post-provisioning, encrypts the new lair keystore ── -->
+  {:else if route === 'join-set-password'}
+    <div class="centered-screen">
+      <div class="join-card join-card--wide join-card--compact">
+        <h1 class="ds-h3 setpw-title">Set a password for this device</h1>
+        <p class="ds-small setpw-subhead">
+          This encrypts your keys on this device — only on this device.
+        </p>
+        <p class="ds-small setpw-body">
+          Your password unlocks the encrypted keystore on this computer when you reopen the app.
+          Choose one you will remember or <strong>save it in a password manager now</strong> — we cannot reset it for you.
+        </p>
+        <div class="form-card-section pw-form">
+          <div class="field">
+            <label class="field-label">Password</label>
+            <div class="pw-input-wrap">
+              <input
+                type={pwSetShow ? 'text' : 'password'}
+                class="ds-input"
+                bind:value={pwSet}
+                placeholder="At least 8 characters"
+                autocomplete="new-password"
+              />
+              <button type="button" class="pw-toggle" onclick={() => pwSetShow = !pwSetShow}>
+                {pwSetShow ? '🙈' : '👁️'}
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Confirm password</label>
+            <input
+              type={pwSetShow ? 'text' : 'password'}
+              class="ds-input"
+              bind:value={pwSetConfirm}
+              placeholder="Type it again"
+              autocomplete="new-password"
+            />
+          </div>
+          {#if pwSetError}
+            <p class="ds-small join-error">{pwSetError}</p>
+          {/if}
+        </div>
+
+        <!-- Serious warning — read this before submitting the password. -->
+        <div class="pw-warning" role="note">
+          <div class="pw-warning-icon" aria-hidden="true">⚠️</div>
+          <div class="pw-warning-body">
+            <p class="pw-warning-title">If you lose this password</p>
+            <p class="pw-warning-text">
+              We cannot recover it for you. Your keys are encrypted on this device with this password
+              and we do not have a copy. You would need to submit a new onboarding form to access
+              Requests &amp; Offers with a new profile.
+            </p>
+          </div>
+        </div>
+
+        <div class="join-actions">
+          <button
+            type="button"
+            class="btn-ds btn-ds--primary"
+            disabled={!pwSet || !!pwSetError || pwSet !== pwSetConfirm}
+            onclick={handleSetPassword}
+          >
+            🔑 Set password and continue
+          </button>
+        </div>
+
+        {#if passwordModeOptional}
+          <div class="pw-skip-block">
+            <h3 class="ds-h4" style="margin: 0 0 8px">Or skip this step</h3>
+            <p class="ds-small" style="color: rgb(var(--fg-2))">
+              You can use Requests &amp; Offers without a password on this device. Your keys will still be stored
+              on this computer, but anyone with access to the computer could open the app as you.
+              <strong>You cannot add a password later without re-onboarding.</strong>
+            </p>
+            <button type="button" class="btn-ghost btn-ghost--sm" onclick={handleSkipPassword}>
+              Skip — open R&amp;O without a password
+            </button>
+          </div>
+        {/if}
+      </div>
+    </div>
+
+  <!-- ── PASSWORD GATE ── returning-user unlock ── -->
+  {:else if route === 'password-gate'}
+    <div class="centered-screen">
+      <div class="join-card">
+        <h1 class="ds-h2">Welcome back</h1>
+        <h2 class="ds-h3" style="text-align: center; margin: 0; color: rgb(var(--fg-1))">
+          Unlock Requests &amp; Offers on this device.
+        </h2>
+        <p class="ds-small" style="text-align: center; color: rgb(var(--fg-3)); margin: 4px 0 0">
+          You set this password when you first joined. It encrypts your keys on this device.
+        </p>
+        <form onsubmit={(e) => { e.preventDefault(); handleUnlock(); }} class="pg-form">
+          <div class="field">
+            <label class="field-label">Email address</label>
+            <input
+              type="email"
+              class="ds-input"
+              bind:value={pgEmail}
+              placeholder="The one you used to apply"
+              autocomplete="username"
+            />
+          </div>
+          <div class="field">
+            <label class="field-label">Your password</label>
+            <div class="pw-input-wrap">
+              <input
+                type={pgShow ? 'text' : 'password'}
+                class="ds-input"
+                bind:value={pgPassword}
+                autocomplete="current-password"
+              />
+              <button type="button" class="pw-toggle" onclick={() => pgShow = !pgShow}>
+                {pgShow ? '🙈' : '👁️'}
+              </button>
+            </div>
+          </div>
+          {#if joining.error}
+            <p class="ds-small join-error">That email and password did not unlock Requests &amp; Offers.</p>
+          {/if}
+          <button type="submit" class="btn-ds btn-ds--primary" disabled={!pgEmail || !pgPassword}>
+            🔓 Unlock
+          </button>
+        </form>
+        <button type="button" class="btn-ghost btn-ghost--sm pg-forgotten" onclick={() => pgForgottenOpen = true}>
+          Forgotten your password?
+        </button>
+      </div>
+    </div>
+
+    {#if pgForgottenOpen}
+      <div class="modal-backdrop" onclick={() => pgForgottenOpen = false}>
+        <div class="modal-panel modal-panel--compact" onclick={(e) => e.stopPropagation()}>
+          <button class="modal-close" onclick={() => pgForgottenOpen = false} aria-label="Close">✕</button>
+          <div class="modal-header">
+            <h2 class="ds-h3" style="margin: 0">Forgotten your password?</h2>
+          </div>
+          <div class="modal-body">
+            <p class="ds-p">
+              Check the password is correct, and check your password manager — most often it is a typo.
+            </p>
+            <p class="ds-p">
+              If you have genuinely lost the password, we cannot recover it. Your keys are encrypted on this device
+              with your password, and we do not have a copy. Your previous activity on this device cannot be recovered.
+            </p>
+            <p class="ds-p">
+              Please email <a href="mailto:info@happenings.community">info@happenings.community</a> — we can re-start
+              the Requests &amp; Offers onboarding process for you.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn-ds btn-ds--primary" onclick={() => pgForgottenOpen = false}>Got it</button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+  <!-- ── MEMBER SUSPENDED ── post-authentication, admin-restricted access ── -->
+  {:else if route === 'member-suspended'}
+    <div class="centered-screen">
+      <div class="join-card join-card--wide">
+        <div class="suspended-header">
+          <div class="suspended-icon" aria-hidden="true">⛔</div>
+          <h1 class="ds-h2" style="margin: 0">Your account is currently suspended</h1>
+        </div>
+        <p class="ds-p suspended-intro">
+          An admin has temporarily restricted your access to Requests &amp; Offers.
+        </p>
+
+        {#if joining.memberStatus}
+          <div class="suspended-detail">
+            <p class="suspended-detail-label">Reason</p>
+            <p class="suspended-detail-value">
+              {joining.memberStatus.reason ?? 'No reason was provided.'}
+            </p>
+          </div>
+
+          <div class="suspended-detail">
+            <p class="suspended-detail-label">Suspension ends</p>
+            <p class="suspended-detail-value">
+              {#if joining.memberStatus.suspended_until}
+                {new Date(joining.memberStatus.suspended_until).toLocaleString(undefined, {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              {:else}
+                Suspension is open-ended.
+              {/if}
+            </p>
+          </div>
+        {/if}
+
+        <p class="ds-p suspended-recourse">
+          If you believe this is in error, or if you'd like to discuss the suspension,
+          please email <a href="mailto:info@happenings.community">info@happenings.community</a>.
+        </p>
+
+        <div class="join-actions">
+          <a class="btn-ds btn-ds--primary" href="mailto:info@happenings.community">
+            ✉️ Email info@happenings.community
+          </a>
+        </div>
+
+        <!-- Demo toggle: flip between temporary and indefinite suspension. -->
+        <div class="suspended-demo-toggle">
+          <span class="ds-small" style="color: rgb(var(--fg-3))">Demo:</span>
+          <button
+            type="button"
+            class="btn-ghost btn-ghost--sm"
+            onclick={() => setSuspensionForDemo('temporary')}
+          >Temporary</button>
+          <button
+            type="button"
+            class="btn-ghost btn-ghost--sm"
+            onclick={() => setSuspensionForDemo('indefinite')}
+          >Indefinite</button>
+        </div>
+      </div>
+    </div>
+
+  <!-- ── RULES RE-ATTESTATION ── stale rules; hard-enforcement gate to home ── -->
+  {:else if route === 'rules-reattestation'}
+    <div class="centered-screen">
+      <div class="join-card join-card--wide">
+        <h1 class="ds-h2 reattest-heading">Our community agreements have been updated</h1>
+        <p class="ds-p reattest-intro">
+          Our community agreements have changed since you last signed. Your continued
+          participation in Requests &amp; Offers depends on reading the updated text
+          below and re-attesting that you commit to it.
+        </p>
+
+        {#if joining.currentRules && joining.userLastAttestedVersion}
+          <div class="reattest-versions">
+            <div class="reattest-version reattest-version--old">
+              <span class="reattest-version-label">You signed</span>
+              <span class="reattest-version-value">v{joining.userLastAttestedVersion}</span>
+            </div>
+            <div class="reattest-arrow" aria-hidden="true">→</div>
+            <div class="reattest-version reattest-version--new">
+              <span class="reattest-version-label">Current</span>
+              <span class="reattest-version-value">v{joining.currentRules.version}</span>
+            </div>
+          </div>
+
+          <p class="ds-small reattest-version-dates">
+            Current since {new Date(joining.currentRules.effective_from).toLocaleDateString(undefined, {
+              year: 'numeric', month: 'long', day: 'numeric'
+            })}
+          </p>
+
+          {#if joining.currentRules.changelog.length > 0}
+            <div class="reattest-changelog">
+              <p class="reattest-changelog-label">
+                What's changed since v{joining.userLastAttestedVersion}
+              </p>
+              <ul class="reattest-changelog-list">
+                {#each joining.currentRules.changelog as change}
+                  <li>{change}</li>
+                {/each}
+              </ul>
+            </div>
+          {/if}
+        {/if}
+
+        <div
+          class="reattest-rules-container"
+          class:reattest-rules-container--unread={!reattestHasScrolled}
+          onscroll={reattestOnScroll}
+          tabindex="0"
+          role="region"
+          aria-label="Updated community agreements"
+        >
+          <h2 class="ds-h3 reattest-rules-heading">Personal Responsibilities</h2>
+          <p class="ds-p">
+            The hAppenings.community collectively strives to foster an increasingly
+            open, inclusive and caring culture.
+          </p>
+          <p class="ds-p">
+            As community participants it is our responsibility to inhabit by these
+            Personal Conduct Guidelines to build a warm and welcoming environment
+            for us all:
+          </p>
+
+          <h3 class="ds-h4 reattest-rules-subheading">Respect diversity</h3>
+          <p class="ds-p">
+            We are committed to supporting social diversity and cultural sensitivity.
+            Please support our conduct standards in all interactions.
+          </p>
+
+          <h3 class="ds-h4 reattest-rules-subheading">Communicate gently</h3>
+          <p class="ds-p">
+            Participants are expected to support contemplative awareness and
+            nonviolent communication in our relationships. This is especially
+            important in online communications. Please consider other perspectives
+            in your interactions.
+          </p>
+
+          <h3 class="ds-h4 reattest-rules-subheading">Communicate effectively</h3>
+          <p class="ds-p">
+            Your voice is welcome. Your perspective is valued. Your interests are
+            interesting. The best thing you can do to give and receive value is
+            participate. Please consider the intended purpose of different
+            communication channels within our community and choose the appropriate
+            channel for different interactions.
+          </p>
+
+          <h3 class="ds-h4 reattest-rules-subheading">Discuss concerns and questions</h3>
+          <p class="ds-p">
+            If you feel uncomfortable or uncertain about our issues or processes,
+            please identify your concerns. You can do this publicly, or privately
+            by contacting one of the community admins or via email to
+            <a href="mailto:info@happenings.community">info@happenings.community</a>.
+          </p>
+
+          <h3 class="ds-h4 reattest-rules-subheading">Resolve conflicts inclusively</h3>
+          <p class="ds-p">
+            We commit to resolve conflicts inclusively using a Transformative
+            Justice approach, aiming to strengthen community and to fairly
+            recognise all serious concerns. We encourage all conflicts to be
+            resolved with the fewest people necessary, again acknowledging that
+            everyone directly affected by the conflict needs to be involved.
+          </p>
+
+          <h3 class="ds-h4 reattest-rules-subheading">Mutual responsibility</h3>
+          <p class="ds-p">
+            We're all responsible, all of the time, to take positive action in
+            response to harassment and abuse. In some instances, this may include
+            reporting to external authorities. Our community expects all
+            participants to take this responsibility seriously.
+          </p>
+
+          <h2 class="ds-h3 reattest-rules-heading">Our Standards</h2>
+          <p class="ds-p">
+            hAppenings.community is dedicated to providing a harassment-free
+            experience for everyone. We do not tolerate harassment of participants
+            in any form.
+          </p>
+          <p class="ds-p">
+            Participants are responsible for knowing and abiding by these rules.
+          </p>
+
+          <p class="ds-p">Harassment includes:</p>
+
+          <h4 class="ds-small reattest-rules-group-heading">Communication and language</h4>
+          <ul class="reattest-rules-list">
+            <li>
+              Offensive comments related to gender, gender identity and
+              expression, sexual orientation, disability, mental illness,
+              neuro(a)typicality, physical appearance, body size, age, race,
+              class, or religion.
+            </li>
+            <li>
+              Unwelcome comments regarding a person's lifestyle choices and
+              practices, including those related to food, health, parenting,
+              drugs, and employment.
+            </li>
+            <li>Deliberate misgendering or use of 'dead' or rejected names.</li>
+          </ul>
+
+          <h4 class="ds-small reattest-rules-group-heading">Threats and disruption</h4>
+          <ul class="reattest-rules-list">
+            <li>Threats of violence.</li>
+            <li>
+              Incitement of violence towards any individual, including
+              encouraging a person to commit suicide or to engage in
+              self-harm.
+            </li>
+            <li>Stalking or following.</li>
+            <li>Sustained disruption of discussion.</li>
+          </ul>
+
+          <h4 class="ds-small reattest-rules-group-heading">Sexual content and unwelcome contact</h4>
+          <ul class="reattest-rules-list">
+            <li>
+              Sexual images or behaviour — not appropriate in the
+              Requests &amp; Offers Holochain ecosystem.
+            </li>
+            <li>Unwelcome sexual attention.</li>
+            <li>
+              Pattern of inappropriate social contact, such as requesting or
+              assuming inappropriate levels of intimacy with others.
+            </li>
+            <li>Continued one-on-one communication after requests to cease.</li>
+          </ul>
+
+          <h4 class="ds-small reattest-rules-group-heading">Privacy</h4>
+          <ul class="reattest-rules-list">
+            <li>
+              Deliberate "outing" of any aspect of a person's identity
+              without their consent except as necessary to protect
+              vulnerable people from intentional abuse.
+            </li>
+            <li>
+              Surveilling another participant's activity — for example
+              screenshotting their messages or listings, or compiling logs
+              of their behaviour for harassment purposes.
+            </li>
+            <li>Publication of private communication.</li>
+          </ul>
+        </div>
+
+        {#if !reattestHasScrolled}
+          <p class="ds-small reattest-scroll-hint">
+            Please read to the end before agreeing.
+          </p>
+        {/if}
+
+        <label class="reattest-checkbox-row">
+          <input
+            type="checkbox"
+            class="ds-checkbox"
+            bind:checked={reattestAccepted}
+            disabled={!reattestHasScrolled}
+          />
+          <span class="reattest-checkbox-label" class:reattest-checkbox-label--disabled={!reattestHasScrolled}>
+            I have read the updated community agreements above and I commit to
+            participate accordingly.
+          </span>
+        </label>
+
+        {#if joining.error}
+          <p class="ds-small join-error">{joining.error}</p>
+        {/if}
+
+        <div class="join-actions">
+          <button
+            type="button"
+            class="btn-ds btn-ds--primary"
+            disabled={!reattestHasScrolled || !reattestAccepted || joining.isLoading}
+            onclick={handleSignAndContinue}
+          >
+            {#if joining.isLoading}
+              ⏳ Signing…
+            {:else}
+              ✍️ Sign and continue
+            {/if}
+          </button>
+        </div>
+      </div>
+    </div>
+
+  {:else if route === 'home'}
     <div class="page">
-      {#if !hasProfile}
-        <!-- New user -->
-        <div class="home-hero">
-          <h1 class="ds-h2">Welcome to Requests &amp; Offers</h1>
-          <p class="ds-p" style="color:rgb(var(--fg-2));max-width:520px;text-align:center">Connect with the hAppenings community to exchange skills, resources, and support.</p>
-          <button class="btn-ds btn-ds--primary" onclick={() => navigate('user-create')}>👤 Join the Community</button>
+      <!--
+        Existing-user view only — the "new user" fork has been removed.
+        Post joining-flow architecture, a not-yet-bound user never reaches /home
+        (the composable routes them to join-welcome via the route-on-transition
+        $effect). Reaching /home implies status === 'authenticated', so the
+        "new user" branch was dead code.
+
+        Welcome-header identity:
+          In production, this should come from useUserAccessGuard.currentUser,
+          which reflects the post-membership UserProfile entry on the member source
+          chain. For the mockup we read joining.claimsData as a proxy
+          since the composable seeds it via __setStatusForDemo. The ME constant
+          remains as the data-graph anchor for REQUESTS/OFFERS counts until the
+          mock graph is re-wired around useUserAccessGuard.
+      -->
+      <!--
+        Hello banner — uses the canonical .banner pattern from the design
+        system (see src/routes/ui-kit/browse-active/+page.svelte). CSS copied
+        into this file's <style> block since .banner is currently scoped to
+        the browse-active scenario; lifting it to a global stylesheet is a
+        design-system housekeeping task for after the show-and-tell.
+      -->
+      <div class="banner">
+        <h2>Hello {joining.claimsData?.x_nickname ?? joining.claimsData?.x_given_name ?? ME.nickname}</h2>
+        <p>
+          {REQUESTS.filter(r=>r.creator.id===ME.id&&r.status==='active').length} active requests
+          · {OFFERS.filter(o=>o.creator.id===ME.id&&o.status==='active').length} active offers
+        </p>
+      </div>
+
+      <!--
+        Dashboard card: Recent Activity (latest requests + offers, time-sorted)
+        side-by-side with News & Events. Uses the existing .listing-card visual
+        vocabulary so the home page does not introduce a new design dialect.
+        News & Events content is placeholder — architecture and content TBD by
+        Anita and Sacha.
+      -->
+      <div class="listing-card listing-card--managed home-dashboard">
+        <div class="home-dashboard-section home-dashboard-section--activity">
+          <header class="home-dashboard-header">
+            <h3 class="ds-h4 home-dashboard-title">Recent Activity</h3>
+            <button
+              class="home-dashboard-link"
+              onclick={() => navigate('requests')}
+            >See all →</button>
+          </header>
+          <ul class="home-dashboard-list">
+            {#each RECENT_ACTIVITY.slice(0, 5) as item (item.kind + ':' + item.id)}
+              <li>
+                <button
+                  class="home-dashboard-item"
+                  onclick={() => navigate(item.kind === 'offer' ? 'offer-detail' : 'request-detail', item.id)}
+                >
+                  <ds-chip tone={item.kind === 'offer' ? 'warning' : 'secondary'}>
+                    {item.kind === 'offer' ? '💡 Offer' : '📝 Request'}
+                  </ds-chip>
+                  <span class="home-dashboard-item-title">{item.title}</span>
+                  <span class="home-dashboard-item-meta">{item.creator.nickname}</span>
+                </button>
+              </li>
+            {/each}
+          </ul>
         </div>
-        <div class="action-grid">
-          <button class="action-card" onclick={() => navigate('requests')}>
-            <div class="action-card-icon">🔍</div>
-            <h3 class="action-card-title">Discover Opportunities</h3>
-            <p class="action-card-desc">Browse active requests from community members looking for skills.</p>
-            <span class="action-card-cta cta--secondary">Browse Requests</span>
-          </button>
-          <button class="action-card" onclick={() => navigate('offers')}>
-            <div class="action-card-icon">✨</div>
-            <h3 class="action-card-title">Offer Your Skills</h3>
-            <p class="action-card-desc">Share what you can contribute to the community.</p>
-            <span class="action-card-cta cta--warning">Post an Offer</span>
-          </button>
-          <button class="action-card" onclick={() => navigate('users')}>
-            <div class="action-card-icon">👥</div>
-            <h3 class="action-card-title">Explore Community</h3>
-            <p class="action-card-desc">Meet members and organisations working together.</p>
-            <span class="action-card-cta cta--tertiary">Meet People</span>
-          </button>
+
+        <div class="home-dashboard-divider" aria-hidden="true"></div>
+
+        <div class="home-dashboard-section home-dashboard-section--news">
+          <header class="home-dashboard-header">
+            <h3 class="ds-h4 home-dashboard-title">News &amp; Events</h3>
+          </header>
+          <ul class="home-dashboard-list">
+            <li class="home-dashboard-news-item">
+              <span class="home-dashboard-news-date">22 May</span>
+              <span class="home-dashboard-news-title">Alpha v0.4 release notes published</span>
+            </li>
+            <li class="home-dashboard-news-item">
+              <span class="home-dashboard-news-date">18 May</span>
+              <span class="home-dashboard-news-title">Community call: Thursday 19:00 BST</span>
+            </li>
+            <li class="home-dashboard-news-item">
+              <span class="home-dashboard-news-date">14 May</span>
+              <span class="home-dashboard-news-title">New rules version v1.0 — please re-attest</span>
+            </li>
+          </ul>
+          <p class="home-dashboard-placeholder ds-small">
+            Community updates will appear here.
+          </p>
         </div>
-      {:else}
-        <!-- Existing user -->
-        <div class="home-welcome">
-          <div class="av av--lg">{ME.name[0]}</div>
-          <div>
-            <h2 class="ds-h3">Welcome back, {ME.nickname}!</h2>
-            <p class="ds-small">{REQUESTS.filter(r=>r.creator.id===ME.id&&r.status==='active').length} active requests · {OFFERS.filter(o=>o.creator.id===ME.id&&o.status==='active').length} active offers</p>
-          </div>
+      </div>
+
+      <div class="quick-cards">
+        <button class="quick-card" onclick={() => navigate('my-listings')}>
+          <span class="quick-card-icon">📋</span>
+          <span class="quick-card-label">My Requests</span>
+          <span class="quick-card-count">{REQUESTS.filter(r=>r.creator.id===ME.id).length}</span>
+        </button>
+        <button class="quick-card" onclick={() => navigate('my-listings')}>
+          <span class="quick-card-icon">🎯</span>
+          <span class="quick-card-label">My Offers</span>
+          <span class="quick-card-count">{OFFERS.filter(o=>o.creator.id===ME.id).length}</span>
+        </button>
+        <button class="quick-card" onclick={() => navigate('user-profile', ME.id)}>
+          <span class="quick-card-icon">👤</span>
+          <span class="quick-card-label">My Profile</span>
+          <span class="quick-card-count">→</span>
+        </button>
+      </div>
+
+
+      <!--
+        How Exchange Works — informational ethos block, modelled on the prod
+        R&O home. The three decorative labels (Service Types / Mutual Aid /
+        Organizations) present in prod are dropped here; they're non-interactive
+        in prod too, and the explainer paragraph does the actual work of
+        communicating the community's character.
+      -->
+      <section class="home-features">
+        <div class="home-features-explainer">
+          <h4 class="home-features-explainer-title">How Exchange Works</h4>
+          <p class="home-features-explainer-body">
+            Our community operates on <strong>mutual aid principles</strong>.
+            Members exchange skills, time, and resources based on trust and
+            reciprocity. Create requests for help, offer your services, and
+            connect directly with community members to arrange exchanges that
+            work for everyone involved.
+          </p>
         </div>
-        <div class="quick-cards">
-          <button class="quick-card" onclick={() => navigate('my-listings')}>
-            <span class="quick-card-icon">📋</span>
-            <span class="quick-card-label">My Requests</span>
-            <span class="quick-card-count">{REQUESTS.filter(r=>r.creator.id===ME.id).length}</span>
-          </button>
-          <button class="quick-card" onclick={() => navigate('my-listings')}>
-            <span class="quick-card-icon">🎯</span>
-            <span class="quick-card-label">My Offers</span>
-            <span class="quick-card-count">{OFFERS.filter(o=>o.creator.id===ME.id).length}</span>
-          </button>
-          <button class="quick-card" onclick={() => navigate('user-profile', ME.id)}>
-            <span class="quick-card-icon">👤</span>
-            <span class="quick-card-label">My Profile</span>
-            <span class="quick-card-count">→</span>
-          </button>
-        </div>
-        <div class="home-primary-actions">
-          <button class="btn-ds btn-ds--secondary" onclick={() => navigate('requests')}>📝 Browse Requests</button>
-          <button class="btn-ds btn-ds--warning"   onclick={() => navigate('offers')}>💡 Browse Offers</button>
-          <button class="btn-ds btn-ds--ghost"     onclick={() => navigate('admin')}>⚙️ Admin Panel</button>
-        </div>
-        <div class="home-community">
-          <h3 class="ds-h4">Community Resources</h3>
-          <div class="community-links">
-            <button class="community-link" onclick={() => navigate('service-types')}>🏷️ Service Types</button>
-            <button class="community-link" onclick={() => navigate('orgs')}>🏢 Organizations</button>
-            <button class="community-link" onclick={() => navigate('users')}>👥 All Users</button>
-          </div>
-        </div>
-      {/if}
+      </section>
     </div>
 
   <!-- ── BROWSE REQUESTS ── -->
@@ -1286,6 +2456,33 @@
   {/if}
 
 </ds-shell>
+
+<!-- ══════════════════════════════════════════════════════════
+     DEMO CONTROLS — fixed bottom-right, always visible
+     Lets the show-and-tell jump between the eleven JoiningStatus
+     values without walking the happy path each time.
+     ══════════════════════════════════════════════════════════ -->
+<div class="demo-controls">
+  <span class="demo-controls-label">🎛️ Demo</span>
+  <select
+    class="demo-controls-select"
+    bind:value={demoStatus}
+    onchange={(e) => setDemoStatus((e.target as HTMLSelectElement).value as JoiningStatus)}
+  >
+    <option value="unauthenticated">unauthenticated</option>
+    <option value="join-pending">join-pending</option>
+    <option value="join-rejected">join-rejected</option>
+    <option value="join-ready">join-ready</option>
+    <option value="provisioning">provisioning</option>
+    <option value="binding-needs-password">binding-needs-password</option>
+    <option value="instance-locked">instance-locked</option>
+    <option value="member-suspended">member-suspended</option>
+    <option value="rules-stale">rules-stale</option>
+    <option value="authenticated">authenticated</option>
+    <option value="unknown">unknown</option>
+  </select>
+  <button class="demo-controls-reset" onclick={() => setDemoStatus('unauthenticated')} title="Reset to unauthenticated">↺</button>
+</div>
 {/if}
 
 <!-- ── CONTACT MODAL ── -->
@@ -1465,18 +2662,12 @@
   .cta--secondary { background: rgb(var(--color-secondary-500)); color: #111; }
   .cta--warning   { background: rgb(var(--color-warning-500));   color: #111; }
   .cta--tertiary  { background: rgb(var(--color-tertiary-500));  color: #111; }
-  .home-welcome { display: flex; align-items: center; gap: 16px; background: #fff; border: 1px solid rgb(var(--border-1)); border-radius: 16px; padding: 24px; margin-bottom: 24px; }
   .quick-cards  { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 16px; }
   .quick-card   { background: #fff; border: 1px solid rgb(var(--border-1)); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; transition: box-shadow 150ms; }
   .quick-card:hover { box-shadow: var(--shadow-md); border-color: rgb(var(--color-primary-300)); }
   .quick-card-icon  { font-size: 24px; }
   .quick-card-label { font: 600 12px/16px var(--font-base); color: rgb(var(--fg-1)); }
   .quick-card-count { font: 700 20px/24px var(--font-base); color: rgb(var(--color-primary-600)); }
-  .home-primary-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 32px; }
-  .home-community h3 { margin-bottom: 12px; }
-  .community-links { display: flex; gap: 10px; flex-wrap: wrap; }
-  .community-link { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #fff; border: 1px solid rgb(var(--border-1)); border-radius: 10px; cursor: pointer; font: 500 13px/18px var(--font-base); transition: box-shadow 100ms; }
-  .community-link:hover { box-shadow: var(--shadow-sm); border-color: rgb(var(--color-primary-300)); }
 
   /* ── Listing cards ───────────────────────────────────────────────────────── */
   .listings-grid  { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 16px; }
@@ -1641,4 +2832,874 @@
     padding: 14px 16px; background: rgb(var(--color-primary-50)); border: 1px solid rgb(var(--color-primary-100)); border-radius: 12px;
   }
   .btn-ghost--sm { padding: 6px 10px; font-size: 12px; flex-shrink: 0; }
+
+  /* ════════════════════════════════════════════════════════════════
+     WAVE 1.1 — Joining flow styles (Phase 4d)
+     Reuses Sacha\'s existing card grammar; chromatic identity via
+     --color-secondary (requests) + --color-warning (offers) tokens.
+     ════════════════════════════════════════════════════════════════ */
+
+  /* Page wrapper for full-bleed joining surfaces (welcome / pending). */
+  .join-page {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 20px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* Hero block — twin-headlines + tightened body. Centered. */
+  .join-hero {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 0 0;
+  }
+  .join-hero .ds-h1 { margin: 0; }
+  .join-hero .ds-h2 { margin: 0; }
+  .join-hero .ds-p { max-width: 600px; margin: 0; }
+  .join-subhead { color: rgb(var(--fg-1)); margin-top: -4px; }
+  .join-tagline { color: rgb(var(--fg-2)); margin-top: 8px; }
+  .join-tagline em { font-style: italic; color: rgb(var(--color-primary-600)); }
+  .join-body { color: rgb(var(--fg-2)); }
+  .join-meta { color: rgb(var(--fg-3)); margin-top: 4px; }
+
+  /* Card-style centered screen for rejected / access-issue. */
+  .join-card {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 32px;
+    background: #fff;
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 16px;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+  .join-card .ds-p { text-align: left; }
+
+  .join-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+
+  .join-error {
+    color: rgb(var(--color-error-600));
+    background: rgb(var(--color-error-50));
+    padding: 10px 14px;
+    border-radius: 8px;
+  }
+
+  .join-footer {
+    text-align: center;
+    color: rgb(var(--fg-3));
+    max-width: 640px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+  .join-footer a { color: rgb(var(--color-primary-600)); text-decoration: none; }
+  .join-footer a:hover { text-decoration: underline; }
+
+  /* Scoreboard — community pulse for unauthenticated + post-application audiences.
+     NEW SURFACE from Anita\'s brief. Built using Sacha\'s existing card vocabulary
+     (white bg, --border-1, 16px radius, shadow-md) + chromatic tinting per column. */
+  .scoreboard {
+    background: #fff;
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 16px;
+    box-shadow: var(--shadow-md);
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .scoreboard-summary {
+    text-align: center;
+    color: rgb(var(--fg-2));
+    margin: 0;
+  }
+  .scoreboard-summary strong { color: rgb(var(--fg-1)); }
+  .scoreboard-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .scoreboard-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid rgb(var(--border-1));
+  }
+  .scoreboard-col--requests { background: rgb(var(--color-secondary-50)); }
+  .scoreboard-col--offers   { background: rgb(var(--color-warning-50)); }
+  .scoreboard-col-title { margin: 0 0 2px; color: rgb(var(--fg-1)); }
+
+  /* Scoreboard listing item — compact horizontal row, clickable. */
+  .scoreboard-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: left;
+    transition: box-shadow 150ms, border-color 150ms;
+    font: inherit;
+    color: inherit;
+  }
+  .scoreboard-item:hover { box-shadow: var(--shadow-md); border-color: rgb(var(--color-primary-300)); }
+  .scoreboard-item-icon { font-size: 18px; flex-shrink: 0; line-height: 1.2; }
+  .scoreboard-item-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+  .scoreboard-item-title {
+    font: 500 14px/20px var(--font-base);
+    color: rgb(var(--fg-1));
+    margin: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .scoreboard-item-meta { margin: 0; color: rgb(var(--fg-3)); }
+
+  /* Responsive: stack columns on narrow viewports. */
+  @media (max-width: 640px) {
+    .scoreboard-cols { grid-template-columns: 1fr; }
+    .join-page { padding: 16px 16px 24px; }
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     WAVE 2 — additional patterns for set-password + password-gate
+     ════════════════════════════════════════════════════════════════ */
+
+  /* Wider variant of join-card for set-password (needs room for two pw fields + skip block). */
+  .join-card--wide { max-width: 640px; }
+
+  /* Body-text block inside a join-card — left-aligned, tighter rhythm. */
+  .join-body-block {
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .join-body-block .ds-p { margin: 0; }
+
+  /* Password-entry pattern: input + show/hide toggle button overlay. */
+  .pw-input-wrap { position: relative; }
+  .pw-input-wrap .ds-input { padding-right: 44px; }
+  .pw-toggle {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 6px 8px;
+    font-size: 16px;
+    line-height: 1;
+    border-radius: 6px;
+  }
+  .pw-toggle:hover { background: rgb(var(--bg-muted)); }
+
+  /* Two-field password form spacing. */
+  .pw-form { display: flex; flex-direction: column; gap: 12px; }
+
+  /* Skip block on set-password — visually distinct, less weight. */
+  .pw-skip-block {
+    margin-top: 8px;
+    padding: 16px;
+    background: rgb(var(--bg-muted));
+    border-radius: 12px;
+    border: 1px dashed rgb(var(--border-1));
+    text-align: left;
+  }
+  .pw-skip-block .ds-small { margin: 0 0 12px; }
+
+  /* Password-gate form layout. */
+  .pg-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 8px;
+  }
+  .pg-form .btn-ds { align-self: stretch; margin-top: 4px; }
+
+  /* Forgotten-password link, sits below the card. */
+  .pg-forgotten {
+    align-self: center;
+    margin-top: 12px;
+    color: rgb(var(--color-primary-600));
+  }
+
+  /* Backdrop for the forgotten-password modal (reuses existing modal-panel grammar). */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 24px;
+  }
+
+  /* ── Wave 2b — centered join-form + tighter set-password ───────────────── */
+
+  .join-form-page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px 24px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .join-form-nav { align-self: flex-start; }
+  .join-form-title { margin: 8px 0 4px; text-align: center; }
+  .join-form-intro { margin: 0 0 16px; color: rgb(var(--fg-2)); text-align: center; }
+  .join-form-card {
+    background: #fff;
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 16px;
+    box-shadow: var(--shadow-md);
+    padding: 28px;
+  }
+
+  /* Set-password — compact variant. */
+  .join-card--wide { padding: 20px 24px; gap: 10px; max-width: 640px; }
+  .join-card--compact { gap: 8px; padding: 16px 24px; }
+  .join-card--compact .ds-h2 { margin: 0; }
+  .setpw-title { margin: 0; text-align: center; }
+  .setpw-subhead { margin: 0; text-align: center; color: rgb(var(--fg-2)); }
+  .setpw-body {
+    text-align: left;
+    margin: 4px 0 0;
+    color: rgb(var(--fg-2));
+    line-height: 1.5;
+  }
+
+  /* Tighter form fields when inside a compact card. */
+  .join-card--compact .form-card-section { gap: 8px; }
+  .join-card--compact .field-label { margin-bottom: 4px; font-size: 13px; }
+
+  /* Compact skip block — outline only, smaller. */
+  .pw-skip-block {
+    margin-top: 2px;
+    padding: 10px 12px;
+    background: transparent;
+    border: 1px dashed rgb(var(--border-1));
+    border-radius: 10px;
+  }
+  .pw-skip-block .ds-h4 { font-size: 13px; margin: 0 0 4px; }
+  .pw-skip-block .ds-small { margin: 0 0 8px; font-size: 12px; }
+
+  /* Password-loss warning — icon scaled to button-height (~48px).
+     Chromatic identity matches Sacha's warning tokens. */
+  .pw-warning {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    background: rgb(var(--color-warning-50));
+    border: 1px solid rgb(var(--color-warning-300));
+    border-radius: 12px;
+    text-align: left;
+  }
+  .pw-warning-icon {
+    font-size: 44px;
+    line-height: 1;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pw-warning-body { flex: 1; min-width: 0; }
+  .pw-warning-title {
+    margin: 0 0 2px;
+    font: 600 14px/20px var(--font-base);
+    color: rgb(var(--fg-1));
+  }
+  .pw-warning-text {
+    margin: 0;
+    font: 400 13px/19px var(--font-base);
+    color: rgb(var(--fg-1));
+  }
+
+  /* Tighter action row spacing. */
+  .join-card--compact .join-actions { margin-top: 2px; }
+
+  /* Missing-required-fields hint above the join-form submit row. */
+  .form-missing-hint {
+    margin: 12px 0 4px;
+    padding: 8px 12px;
+    background: rgb(var(--color-warning-50));
+    border: 1px solid rgb(var(--color-warning-300));
+    border-radius: 8px;
+    color: rgb(var(--fg-1));
+    text-align: left;
+  }
+
+  /* Disabled state for primary button when required fields are missing.
+     btn-ds--primary doesn't ship with a visible :disabled treatment, so add one. */
+  .btn-ds--disabled,
+  .btn-ds:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+  .btn-ds--disabled:hover,
+  .btn-ds:disabled:hover { box-shadow: none; }
+
+  /* Join-pending status sub-heading sits below the twin-headline pair. */
+  .join-pending-status {
+    margin: 12px 0 0;
+    color: rgb(var(--fg-1));
+  }
+
+  /* ── Wave 3a — member-suspended screen ─────────────────────────────────── */
+
+  .suspended-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    text-align: left;
+  }
+  .suspended-icon {
+    font-size: 56px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .suspended-intro {
+    text-align: left;
+    margin: 0;
+    color: rgb(var(--fg-2));
+  }
+  .suspended-detail {
+    padding: 12px 14px;
+    background: rgb(var(--bg-muted));
+    border-radius: 10px;
+    text-align: left;
+  }
+  .suspended-detail-label {
+    margin: 0 0 4px;
+    font: 700 13px/18px var(--font-base);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgb(var(--fg-1));
+  }
+  .suspended-detail-value {
+    margin: 0;
+    font: 400 14px/20px var(--font-base);
+    color: rgb(var(--fg-1));
+  }
+  .suspended-recourse {
+    text-align: left;
+    margin: 4px 0 0;
+    color: rgb(var(--fg-2));
+    line-height: 1.5;
+  }
+  .suspended-demo-toggle {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed rgb(var(--border-1));
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  /* Demo controls — fixed bottom-right, always visible. */
+  .demo-controls {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px 8px 12px;
+    background: rgb(var(--bg-1));
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+    font: 500 12px/1 var(--font-base);
+  }
+  .demo-controls-label { color: rgb(var(--fg-3)); }
+  .demo-controls-select {
+    font: 500 12px/1 var(--font-base);
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid rgb(var(--border-1));
+    background: rgb(var(--bg-1));
+    color: rgb(var(--fg-1));
+    cursor: pointer;
+  }
+  .demo-controls-reset {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 1px solid rgb(var(--border-1));
+    background: rgb(var(--bg-1));
+    color: rgb(var(--fg-2));
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .demo-controls-reset:hover { background: rgb(var(--bg-muted)); color: rgb(var(--fg-1)); }
+
+  /* ==========================================================================
+     Wave 3b — rules-reattestation
+     ========================================================================== */
+  .reattest-heading {
+    margin: 0 0 12px 0;
+  }
+  .reattest-intro {
+    margin: 0 0 20px 0;
+    color: rgb(var(--fg-2));
+  }
+
+  .reattest-versions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin: 8px 0 6px 0;
+  }
+  .reattest-version {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 18px;
+    border-radius: 12px;
+    border: 1px solid rgb(var(--border-1));
+    min-width: 96px;
+  }
+  .reattest-version--old {
+    background: rgb(var(--bg-muted));
+    color: rgb(var(--fg-3));
+  }
+  .reattest-version--new {
+    background: rgb(var(--color-secondary-50) / 0.18);
+    border-color: rgb(var(--color-secondary-50) / 0.5);
+    color: rgb(var(--fg-1));
+  }
+  .reattest-version-label {
+    font: 500 11px/1 var(--font-base);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .reattest-version-value {
+    font: 600 18px/1 var(--font-base);
+  }
+  .reattest-arrow {
+    font-size: 22px;
+    color: rgb(var(--fg-3));
+    font-weight: 300;
+  }
+  .reattest-version-dates {
+    text-align: center;
+    color: rgb(var(--fg-3));
+    margin: 0 0 20px 0;
+  }
+
+  .reattest-changelog {
+    background: rgb(var(--color-warning-50) / 0.12);
+    border-left: 3px solid rgb(var(--color-warning-50));
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 0 0 24px 0;
+  }
+  .reattest-changelog-label {
+    font: 600 13px/1.2 var(--font-base);
+    color: rgb(var(--fg-1));
+    margin: 0 0 8px 0;
+  }
+  .reattest-changelog-list {
+    margin: 0;
+    padding-left: 20px;
+    color: rgb(var(--fg-2));
+    font-size: 14px;
+  }
+  .reattest-changelog-list li {
+    margin: 4px 0;
+  }
+
+  .reattest-rules-container {
+    height: 360px;
+    overflow-y: scroll; /* force scrollbar to always be present */
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 10px;
+    padding: 18px 22px;
+    background: rgb(var(--bg-1));
+    transition: box-shadow 200ms ease;
+    /* Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--fg-3)) rgb(var(--bg-muted));
+  }
+  /* WebKit / Chromium / Brave */
+  .reattest-rules-container::-webkit-scrollbar {
+    width: 10px;
+  }
+  .reattest-rules-container::-webkit-scrollbar-track {
+    background: rgb(var(--bg-muted));
+    border-radius: 0 10px 10px 0;
+  }
+  .reattest-rules-container::-webkit-scrollbar-thumb {
+    background: rgb(var(--fg-3));
+    border-radius: 5px;
+    border: 2px solid rgb(var(--bg-muted));
+  }
+  .reattest-rules-container::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--fg-2));
+  }
+  .reattest-rules-container:focus {
+    outline: 2px solid rgb(var(--color-primary-50) / 0.5);
+    outline-offset: 2px;
+  }
+  .reattest-rules-container--unread {
+    /* Stronger fade — uses a soft secondary-tinted overlay so the gradient
+       is visible against the rules container's white background. */
+    box-shadow: inset 0 -60px 30px -32px rgb(var(--color-secondary-50) / 0.18);
+  }
+  .reattest-rules-heading {
+    margin: 0 0 12px 0;
+    color: rgb(var(--fg-1));
+  }
+  .reattest-rules-heading:not(:first-child) {
+    margin-top: 24px;
+  }
+  .reattest-rules-subheading {
+    margin: 16px 0 6px 0;
+    color: rgb(var(--fg-1));
+  }
+  .reattest-rules-list {
+    margin: 8px 0 0 0;
+    padding-left: 20px;
+    color: rgb(var(--fg-2));
+  }
+  .reattest-rules-list li {
+    margin: 6px 0;
+  }
+
+  .reattest-scroll-hint {
+    margin: 12px auto 0 auto;
+    padding: 8px 16px;
+    color: rgb(var(--color-warning-800));
+    background: rgb(var(--color-warning-100));
+    border: 1px solid rgb(var(--color-warning-400));
+    border-radius: 999px;
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    text-align: center;
+    font-style: italic;
+    font-weight: 600;
+  }
+
+  .reattest-checkbox-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 20px 0 0 0;
+    padding: 14px 16px;
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 10px;
+    background: rgb(var(--bg-1));
+    cursor: pointer;
+  }
+  .reattest-checkbox-row:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  .reattest-checkbox-label {
+    color: rgb(var(--fg-1));
+    line-height: 1.5;
+    font-size: 14px;
+  }
+  .reattest-checkbox-label--disabled {
+    color: rgb(var(--fg-3));
+  }
+
+  /* ==========================================================================
+     Wave 3c — join-approved (provisioning + agreements attestation)
+     Reuses .reattest-rules-container, .reattest-scroll-hint,
+     .reattest-checkbox-row, .reattest-checkbox-label from Wave 3b.
+     ========================================================================== */
+  .approve-heading {
+    margin: 0 0 4px 0;
+  }
+  .approve-subhead-emoji {
+    text-align: center;
+    font-size: 38px;
+    line-height: 1;
+    margin: 0 0 8px 0;
+  }
+  .approve-subhead {
+    margin: 0 0 22px 0;
+    text-align: center;
+    font: 700 22px/1.3 var(--font-base);
+    color: rgb(var(--color-primary-700));
+  }
+
+  .approve-welcome-list {
+    counter-reset: approve-welcome;
+    list-style: none;
+    margin: 0 0 18px 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .approve-welcome-list li {
+    counter-increment: approve-welcome;
+    position: relative;
+    padding: 12px 14px 12px 48px;
+    border-radius: 10px;
+    background: rgb(var(--color-secondary-50) / 0.10);
+    border-left: 3px solid rgb(var(--color-secondary-50));
+    color: rgb(var(--fg-1));
+    line-height: 1.5;
+    font-size: 14px;
+  }
+  .approve-welcome-list li::before {
+    content: counter(approve-welcome);
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgb(var(--color-secondary-50));
+    color: rgb(var(--bg-1));
+    font: 700 14px/28px var(--font-base);
+    text-align: center;
+  }
+  .approve-welcome-lead {
+    color: rgb(var(--fg-1));
+    font-weight: 600;
+    margin-right: 4px;
+  }
+
+  .approve-agreements-section {
+    border-top: 1px solid rgb(var(--border-1));
+    padding-top: 18px;
+    margin-top: 6px;
+  }
+  .approve-agreements-intro {
+    margin: 0 0 14px 0;
+    color: rgb(var(--fg-2));
+  }
+
+  .approve-closing {
+    margin: 14px 0 0 0;
+    color: rgb(var(--fg-3));
+    text-align: center;
+    font-style: italic;
+  }
+
+  /* Bold variant for the agreements-intro paragraph. */
+  .approve-agreements-intro--bold {
+    font-weight: 600;
+    color: rgb(var(--fg-1));
+  }
+
+  /* Group sub-headings inside the rules scroll container. */
+  .reattest-rules-group-heading {
+    margin: 16px 0 6px 0;
+    font: 700 italic 15px/1.3 var(--font-base);
+    color: rgb(var(--fg-1));
+    text-align: left;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+  .reattest-rules-group-heading:first-of-type {
+    margin-top: 8px;
+  }
+
+  /* Tighten the rules list spacing now that there are sub-grouped lists. */
+  .reattest-rules-container ul.reattest-rules-list {
+    margin: 4px 0 0 0;
+    padding-left: 22px;
+  }
+  .reattest-rules-container ul.reattest-rules-list li {
+    margin: 3px 0;
+    text-align: left;
+  }
+
+  /* ==========================================================================
+     Phase 4e — .banner (lifted from src/routes/ui-kit/browse-active/+page.svelte)
+     Canonical hero-banner pattern from the design system. Should eventually
+     move to a global stylesheet so every scenario shares one source of truth.
+     ========================================================================== */
+  .banner {
+    border-radius: 16px;
+    padding: 32px;
+    color: #fff;
+    box-shadow: var(--shadow-lg);
+    margin-bottom: 32px;
+    background: linear-gradient(
+      90deg,
+      rgb(var(--color-primary-500)) 0%,
+      rgb(var(--color-secondary-500)) 100%
+    );
+  }
+  .banner h2 {
+    margin: 0 0 8px;
+    font: 700 28px/34px var(--font-base);
+  }
+  .banner p {
+    margin: 0;
+    font: 400 16px/24px var(--font-base);
+    opacity: .92;
+  }
+
+  /* ==========================================================================
+     Phase 4e — home dashboard card (Recent Activity + News & Events)
+     Uses the existing .listing-card visual vocabulary; this stylesheet adds
+     only the internal two-section split.
+     ========================================================================== */
+  .home-dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    gap: 24px;
+    align-items: stretch;
+    margin: 0 0 24px 0;
+  }
+  @media (max-width: 720px) {
+    .home-dashboard {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .home-dashboard-divider {
+      display: none;
+    }
+  }
+  .home-dashboard-divider {
+    background: rgb(var(--border-1));
+  }
+  .home-dashboard-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0; /* prevent overflow from long item titles */
+  }
+  .home-dashboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 4px 0;
+  }
+  .home-dashboard-title {
+    margin: 0;
+    font-size: 15px;
+    color: rgb(var(--fg-1));
+  }
+  .home-dashboard-link {
+    background: none;
+    border: none;
+    color: rgb(var(--fg-3));
+    font: 500 12px/1 var(--font-base);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 6px;
+  }
+  .home-dashboard-link:hover {
+    color: rgb(var(--fg-1));
+    background: rgb(var(--bg-muted));
+  }
+
+  .home-dashboard-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .home-dashboard-item {
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 6px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    font: 400 14px/1.3 var(--font-base);
+    color: rgb(var(--fg-1));
+  }
+  .home-dashboard-item:hover {
+    background: rgb(var(--bg-muted));
+  }
+  .home-dashboard-item-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .home-dashboard-item-meta {
+    font-size: 12px;
+    color: rgb(var(--fg-3));
+  }
+
+  .home-dashboard-news-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 6px 8px;
+  }
+  .home-dashboard-news-date {
+    font: 600 11px/1 var(--font-base);
+    color: rgb(var(--color-primary-700));
+    min-width: 48px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .home-dashboard-news-title {
+    font: 500 14px/1.3 var(--font-base);
+    color: rgb(var(--fg-1));
+  }
+  .home-dashboard-placeholder {
+    margin: 8px 0 0 0;
+    color: rgb(var(--fg-3));
+    font-style: italic;
+    text-align: center;
+  }
+
+  /* ==========================================================================
+     Phase 4e — Community Features block (matches prod R&O home structure)
+     ========================================================================== */
+  .home-features {
+    margin-top: -4px; /* tighten the gap from the quick-cards row above */
+  }
+  .home-features-explainer {
+    background: rgb(var(--color-primary-50));
+    border: 1px solid rgb(var(--color-primary-200));
+    border-radius: 10px;
+    padding: 16px;
+    text-align: left;
+  }
+  .home-features-explainer-title {
+    margin: 0 0 8px 0;
+    font: 600 14px/1.3 var(--font-base);
+    color: rgb(var(--color-primary-800));
+  }
+  .home-features-explainer-body {
+    margin: 0;
+    font: 400 13px/1.5 var(--font-base);
+    color: rgb(var(--color-primary-700));
+  }
+  .home-features-explainer-body strong {
+    color: rgb(var(--color-primary-800));
+  }
 </style>

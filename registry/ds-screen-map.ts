@@ -37,6 +37,20 @@ const SCREEN_MAP = [
     { key: 'profile-guard', label: 'Profile guard', ic: '🔒' },
     { key: 'connecting',    label: 'Connecting…',   ic: '🔗' },
   ]},
+  { section: 'Joining', screens: [
+    { key: 'join-welcome',      label: 'Welcome (public)',  ic: '🤝' },
+    { key: 'join-form',         label: 'Application form',  ic: '📝' },
+    { key: 'join-pending',      label: 'Awaiting review',   ic: '⏳' },
+    { key: 'join-approved',     label: 'Welcome aboard',    ic: '🎉' },
+    { key: 'join-set-password', label: 'Set device password', ic: '🔑' },
+    { key: 'join-rejected',     label: 'Not at this time',  ic: '💌' },
+  ]},
+  { section: 'Membrane gates', screens: [
+    { key: 'password-gate',       label: 'Unlock instance',    ic: '🔒' },
+    { key: 'rules-reattestation', label: 'Updated agreements', ic: '📜' },
+    { key: 'member-suspended',    label: 'Account suspended',  ic: '⛔' },
+    { key: 'access-issue',        label: 'Access issue',       ic: '⚠️' },
+  ]},
   { section: 'Admin', screens: [
     { key: 'admin',                label: 'Dashboard',           ic: '🏠' },
     { key: 'admin-mediums',        label: 'Mediums of Exchange', ic: '💱' },
