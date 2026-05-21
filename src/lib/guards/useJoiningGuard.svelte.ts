@@ -1,58 +1,132 @@
 /**
- * useJoiningGuard — Layer 0/1 composable for the R&O joining flow.
+ * useJoiningGuard — composable for the R&O joining flow.
  *
- * Handles the pre-membership-to-bound-and-unlocked lifecycle:
- *   - Layer 0 (hard membrane): lobby DHT presence, application status, membrane proof
- *   - Layer 1 (instance gate): local lair-keystore password protection
+ * Integrates with the canonical Holo joining-service pathway:
+ *   https://github.com/Holo-Host/joining-service
  *
- * Layer 2 (post-bound capability) is handled by useUserAccessGuard.
- * The two are composed by useMembraneFlow for app-shell consumption.
+ * R&O uses the joining-service + hc-auth-server, configured with the
+ * hc_auth_approval auth method. Admin approval is mediated through the
+ * hc-auth state machine (pending -> authorized -> blocked). Cryptographic
+ * admittance is via membrane proofs signed by the joining-service's
+ * ed25519 signing key, whose public key is burned into the R&O DNA
+ * properties as the progenitor and validated at genesis_self_check.
  *
- * THREE-SIG BINDING PROTOCOL
- *   Sig 1: Applicant submission (lobby AgentID, lobby DHT)
- *   Sig 2: Admin approval (admin AgentID, lobby DHT, issues membrane proof)
- *   Sig 3: Member binding + rules attestation (new member AgentID, main R&O DHT)
+ * FLOW (per spec sections 3.2 - 3.5)
+ *   1. Client generates AgentPubKey (lair-keystore)
+ *   2. POST /v1/join { agent_key, claims } -> session + status
+ *   3. If status === "pending", poll GET /v1/join/{session}/status until
+ *      hc-auth transitions agent to "authorized" (status becomes "ready")
+ *   4. GET /v1/join/{session}/provision -> membrane_proofs, linker_urls,
+ *      happ_bundle_url, dna_modifiers
+ *   5. Install hApp with provision data; genesis_self_check validates
+ *      the membrane proof against the DNA's embedded progenitor
+ *   6. R&O-internal: rules attestation on first sign-in
  *
- * STATE MAP (eleven states, see JoiningStatus union)
- *   unknown -> access-issue
- *   unauthenticated -> join-welcome
- *   lobby-pending -> join-pending
- *   lobby-rejected -> join-rejected
- *   lobby-approved -> join-approved
- *   binding-in-progress -> join-approved (loading state)
- *   binding-needs-password -> join-set-password
- *   instance-locked -> password-gate
- *   member-suspended -> member-suspended
- *   rules-stale -> rules-reattestation
- *   authenticated -> defer to useUserAccessGuard / home
+ * CUSTOM CLAIMS (LOAD-BEARING ASSUMPTION)
+ *   The spec types `claims` as Record<string, string> (spec section 9)
+ *   and the documented `hc_auth.forward_claims` config forwards named
+ *   claim keys to hc-auth as metadata. The spec's claim table only
+ *   enumerates email/phone/evm_address/solana_address/invite_code — it
+ *   does not explicitly document x_* prefixed custom keys. R&O assumes
+ *   x_introduction, x_why_here, x_user_type, x_given_name, x_family_name,
+ *   x_nickname will be accepted and forwarded; this MUST be confirmed
+ *   with Holo before any production deployment. If custom claims do not
+ *   work, R&O's pre-membership application data needs a different home
+ *   (out-of-band admin tool, delegated_verification partner, etc.) and
+ *   the claims form on the mockup needs redesign.
+ *
+ * REVOCATION
+ *   Member suspension is sourced from hc-auth state. When hc-auth marks
+ *   an agent "blocked", the joining-service returns 403 agent_revoked
+ *   on /provision and /reconnect. The composable surfaces this as
+ *   member-suspended after the agent is already bound.
+ *
+ * RULES ATTESTATION
+ *   R&O-internal post-membership concern. Happens on the main R&O DHT
+ *   after install. Separate from the joining-service flow.
  *
  * IDENTITY IMMUTABILITY
- *   After "authenticated" status, given/family/mononym are locked.
- *   Nickname, bio, email, userType remain editable.
- *
- * AGENT ID BINDING
- *   The member AgentID is canonical post-binding. The lobby AgentID + application
- *   data persist as provenance via the Joining History view.
- *
- * SCHEMA VOCABULARY
- *   This composable uses the canonical schema vocabulary throughout:
- *   - status_type values: "pending" | "accepted" | "rejected" | "archived"
- *     | "suspended temporarily" | "suspended indefinitely"
- *   - field names match administration.schemas.ts (snake_case from DHT)
+ *   After binding, x_given_name and x_family_name (and the mononym
+ *   sentinel) are locked. x_nickname, bio, email, x_user_type remain
+ *   editable on the main R&O DHT.
  *
  * THIS IS A MOCK IMPLEMENTATION for the design-system pass.
- * Methods are stubs; data is in-memory; __setStatusForDemo drives the FAB control.
- * Sacha lifts this into R&O by replacing the mock methods with real DHT calls.
+ * Methods are stubs that mimic the joining-service REST API. Real
+ * implementation replaces each method body with the corresponding
+ * fetch() call to the joining-service base URL.
  */
 
 // ============================================================================
-// TYPES
+// TYPES (mirror spec section 9: TypeScript Type Definitions)
 // ============================================================================
 
-/** Provenance of how a member entered R&O. */
-export type Provenance = "lobby" | "pre-lobby";
+/** Spec-defined auth methods. */
+export type AuthMethod =
+  | "open"
+  | "email_code"
+  | "sms_code"
+  | "evm_signature"
+  | "solana_signature"
+  | "invite_code"
+  | "agent_allow_list"
+  | "hc_auth_approval"
+  | "delegated_verification"
+  | `x-${string}`;
 
-/** Schema-aligned status_type values (mirrors administration.schemas.ts). */
+/** OR-group of auth methods. */
+export type AuthMethodGroup = { any_of: AuthMethod[] };
+
+/** Either a single method or an OR-group. */
+export type AuthMethodEntry = AuthMethod | AuthMethodGroup;
+
+/** Session status (spec section 3.2). */
+export type JoinStatus = "ready" | "pending" | "rejected";
+
+/** A single verification challenge (spec section 9). */
+export type Challenge = {
+  id: string;
+  type: AuthMethod;
+  description: string;
+  expires_at?: string;
+  metadata?: Record<string, unknown>;
+  completed?: boolean;
+  /** Challenges sharing the same group are OR alternatives. */
+  group?: string;
+};
+
+/** Session record returned by POST /v1/join (spec section 9). */
+export type JoinSession = {
+  session: string;
+  status: JoinStatus;
+  challenges?: Challenge[];
+  reason?: string;
+  poll_interval_ms?: number;
+};
+
+/** Provision data returned by GET /v1/join/{session}/provision (spec section 9). */
+export type JoinProvision = {
+  /** Each entry may carry its own expires_at. */
+  linker_urls?: { url: string; expires_at?: string }[];
+  /** Map of DnaHash (base64) to base64-encoded msgpack membrane proof. */
+  membrane_proofs?: Record<string, string>;
+  happ_bundle_url?: string;
+  dna_modifiers?: {
+    network_seed?: string;
+    properties?: Record<string, unknown>;
+  };
+  /** Network service URLs for conductor configuration. */
+  network_config?: {
+    auth_server_url?: string;
+    bootstrap_url?: string;
+    relay_url?: string;
+  };
+};
+
+// ============================================================================
+// R&O-INTERNAL TYPES (post-membership; not part of the joining-service spec)
+// ============================================================================
+
+/** R&O status_type values (mirrors administration.schemas.ts in the main repo). */
 export type StatusType =
   | "pending"
   | "accepted"
@@ -61,79 +135,107 @@ export type StatusType =
   | "suspended temporarily"
   | "suspended indefinitely";
 
-/** Mirror of StatusInDHT from administration.schemas.ts. */
+/** Mirror of StatusInDHT from R&O administration.schemas.ts. */
 export type StatusInDHT = {
   status_type: StatusType;
   reason?: string;
-  suspended_until?: string; // ISO date string per schema
+  suspended_until?: string;
   created_at?: number;
   updated_at?: number;
 };
 
-/** Eleven-state union for the joining lifecycle. */
+/** Currently active rules version (lives on the main R&O DHT). */
+export type RulesVersion = {
+  version: string;
+  document_hash: string;
+  effective_from: number;
+  changelog: string[];
+};
+
+// ============================================================================
+// COMPOSABLE STATE UNION
+// ============================================================================
+
+/**
+ * Composable state union — eleven states.
+ *
+ *   unknown                  -- async resolution gap on first render
+ *   unauthenticated          -- no agent key generated yet
+ *   join-pending             -- POST /v1/join returned status: "pending"
+ *                               (one or more challenges await; for
+ *                               hc_auth_approval the challenge is the
+ *                               operator-decision poll)
+ *   join-rejected            -- status: "rejected" OR agent_revoked
+ *   join-ready               -- status: "ready"; /provision not yet called
+ *   provisioning             -- /provision in flight; installing hApp
+ *   binding-needs-password   -- install done; lair-keystore needs a
+ *                               password set this session
+ *   instance-locked          -- lair password is set; not unlocked this
+ *                               session
+ *   member-suspended         -- hc-auth marked agent "blocked" after
+ *                               binding; surfaced via 403 agent_revoked
+ *   rules-stale              -- R&O-internal; user has not attested to
+ *                               current rules version
+ *   authenticated            -- bound, currently authorised, attesting
+ *                               to current rules
+ */
 export type JoiningStatus =
   | "unknown"
   | "unauthenticated"
-  | "lobby-pending"
-  | "lobby-rejected"
-  | "lobby-approved"
-  | "binding-in-progress"
+  | "join-pending"
+  | "join-rejected"
+  | "join-ready"
+  | "provisioning"
   | "binding-needs-password"
   | "instance-locked"
   | "member-suspended"
   | "rules-stale"
   | "authenticated";
 
-/** Data submitted at join-form (Sig 1 payload). */
-export type ApplicationData = {
-  givenName: string;
-  familyName: string; // "." sentinel for mononym
-  nickname: string;
+// ============================================================================
+// CLAIMS DATA (R&O's applicant form payload)
+// ============================================================================
+
+/**
+ * Data the applicant submits via the join-form screen.
+ *
+ * These map to the `claims` field on POST /v1/join. The x_* prefixed
+ * keys are custom claims forwarded to hc-auth as metadata (load-bearing
+ * assumption — see docstring).
+ *
+ * `email` is also in `claims` because it satisfies email_code or
+ * email_verification if used.
+ */
+export type ClaimsData = {
   email: string;
-  userType: "advocate" | "creator"; // mutually exclusive per existing user-create grammar
-  reason: string; // free-text "what brings you here?"
+  x_given_name: string;
+  x_family_name: string;
+  x_nickname: string;
+  x_user_type: "advocate" | "creator";
+  x_introduction: string;
+  /** Optional, if the hApp is configured with invite_code auth. */
+  invite_code?: string;
 };
 
-/** Lobby-DHT application record (post-Sig-1). */
-export type LobbyApplication = {
-  applicationActionHash: string;
-  lobbyAgentPubKey: string | null; // null for pre-lobby members
-  data: ApplicationData;
-  submitted_at: number;
-};
+/** Convert ClaimsData to the wire-format claims object. */
+function toClaimsPayload(data: ClaimsData): Record<string, string> {
+  const claims: Record<string, string> = {
+    email: data.email,
+    x_given_name: data.x_given_name,
+    x_family_name: data.x_family_name,
+    x_nickname: data.x_nickname,
+    x_user_type: data.x_user_type,
+    x_introduction: data.x_introduction
+  };
+  if (data.invite_code) {
+    claims.invite_code = data.invite_code;
+  }
+  return claims;
+}
 
-/** Lobby-DHT admin approval record (Sig 2). */
-export type ApprovalAttestation = {
-  applicationActionHash: string;
-  membraneProofHash: string | null; // null for pre-lobby members
-  approved_at: number;
-};
-
-/** Main-DHT record committed by new member AgentID (Sig 3). */
-export type LobbyOrigin = {
-  lobbyApplicationActionHash: string;
-  provenance: Provenance;
-  rules_version: string; // semver of attested rules
-  rules_document_hash: string; // anchor to the lobby-DHT rules doc
-  bound_at: number;
-};
-
-/** Currently active rules version (lives in lobby DHT). */
-export type RulesVersion = {
-  version: string; // semver
-  document_hash: string;
-  effective_from: number;
-  changelog: string[]; // bulleted changes from previous version
-};
-
-/** Action button shape (mirrors useUserAccessGuard.UserAccessAction). */
-export type JoiningAction = {
-  label: string;
-  href?: string;
-  action?: string;
-  variant: string;
-  primary?: boolean;
-};
+// ============================================================================
+// COMPOSABLE INTERFACE
+// ============================================================================
 
 export type UseJoiningGuardOptions = {
   autoCheck?: boolean;
@@ -146,34 +248,42 @@ export type UseJoiningGuard = {
   readonly status: JoiningStatus;
   readonly nextRoute: string;
 
-  // ---- application / binding data ----
-  readonly application: LobbyApplication | null;
-  readonly approval: ApprovalAttestation | null;
-  readonly binding: LobbyOrigin | null;
+  // ---- joining-service session lifecycle ----
+  readonly claimsData: ClaimsData | null;
+  readonly joinSession: JoinSession | null;
+  readonly joinProvision: JoinProvision | null;
 
-  // ---- member status (pass-through from would-be useUserAccessGuard) ----
+  // ---- R&O-internal post-membership ----
   readonly memberStatus: StatusInDHT | null;
-
-  // ---- rules ----
   readonly currentRules: RulesVersion | null;
   readonly userLastAttestedVersion: string | null;
 
-  // ---- methods (Sig 1 / Sig 3 / unlock / rules) ----
-  submitApplication: (data: ApplicationData) => Promise<void>;
-  beginBinding: () => Promise<void>;
+  // ---- methods (joining-service REST API + local lair operations) ----
+  /** POST /v1/join — submits agent_key + claims, returns session. */
+  submitJoinRequest: (data: ClaimsData) => Promise<void>;
+  /** GET /v1/join/{session}/status — polls for hc-auth decision. */
+  pollSessionStatus: () => Promise<void>;
+  /** GET /v1/join/{session}/provision — fetches membrane proof + install data. */
+  fetchProvision: () => Promise<void>;
+  /** Local: set lair-keystore password for first time. */
   setInstancePassword: (password: string) => Promise<void>;
+  /** Local: continue without lair password (passwordMode=optional). */
   skipInstancePassword: () => Promise<void>;
+  /** Local: unlock lair-keystore for this session. */
   unlockInstance: (email: string, password: string) => Promise<void>;
+  /** R&O-internal: attest to current rules version on main DHT. */
   attestCurrentRules: () => Promise<void>;
+  /** Re-run state detection. */
   retry: () => Promise<void>;
+  /** Clear all state, return to unauthenticated. */
   reset: () => void;
 
-  // ---- demo-only escape hatch for FAB control ----
+  // ---- demo-only escape hatch ----
   __setStatusForDemo: (status: JoiningStatus, opts?: { memberStatus?: StatusInDHT }) => void;
 };
 
 // ============================================================================
-// COPY HELPERS (route mapping)
+// ROUTE MAPPING
 // ============================================================================
 
 function routeForStatus(status: JoiningStatus): string {
@@ -182,14 +292,14 @@ function routeForStatus(status: JoiningStatus): string {
       return "access-issue";
     case "unauthenticated":
       return "join-welcome";
-    case "lobby-pending":
+    case "join-pending":
       return "join-pending";
-    case "lobby-rejected":
+    case "join-rejected":
       return "join-rejected";
-    case "lobby-approved":
+    case "join-ready":
       return "join-approved";
-    case "binding-in-progress":
-      return "join-approved"; // same screen, internal loading state
+    case "provisioning":
+      return "join-approved";
     case "binding-needs-password":
       return "join-set-password";
     case "instance-locked":
@@ -226,6 +336,15 @@ const MOCK_SUSPENDED_TEMP: StatusInDHT = {
   updated_at: Date.parse("2026-05-18T14:30:00Z")
 };
 
+const MOCK_CLAIMS_DATA: ClaimsData = {
+  email: "sam@example.org",
+  x_given_name: "Sam",
+  x_family_name: "Turner",
+  x_nickname: "sam",
+  x_user_type: "creator",
+  x_introduction: "Mutual-aid practitioner exploring sovereign infrastructure."
+};
+
 // ============================================================================
 // COMPOSABLE
 // ============================================================================
@@ -238,11 +357,11 @@ export function useJoiningGuard(options: UseJoiningGuardOptions = {}): UseJoinin
   let error = $state<string | null>(null);
   let status = $state<JoiningStatus>("unauthenticated");
 
-  let application = $state<LobbyApplication | null>(null);
-  let approval = $state<ApprovalAttestation | null>(null);
-  let binding = $state<LobbyOrigin | null>(null);
-  let memberStatus = $state<StatusInDHT | null>(null);
+  let claimsData = $state<ClaimsData | null>(null);
+  let joinSession = $state<JoinSession | null>(null);
+  let joinProvision = $state<JoinProvision | null>(null);
 
+  let memberStatus = $state<StatusInDHT | null>(null);
   let currentRules = $state<RulesVersion | null>(MOCK_RULES_V1);
   let userLastAttestedVersion = $state<string | null>(null);
 
@@ -251,58 +370,104 @@ export function useJoiningGuard(options: UseJoiningGuardOptions = {}): UseJoinin
 
   // ---- methods ----
 
-  async function submitApplication(data: ApplicationData): Promise<void> {
-    // MOCK: Sig 1 — applicant commits LobbyApplication to lobby DHT.
-    // Real implementation: callZome to lobby DNA "submit_application".
+  async function submitJoinRequest(data: ClaimsData): Promise<void> {
+    // MOCK: Real implementation calls:
+    //   const agentKey = await generateAgentPubKey();  // lair-keystore
+    //   const res = await fetch(`${SERVICE_URL}/v1/join`, {
+    //     method: "POST",
+    //     headers: { "Content-Type": "application/json" },
+    //     body: JSON.stringify({
+    //       agent_key: agentKey,
+    //       claims: toClaimsPayload(data),
+    //     }),
+    //   });
+    //   joinSession = await res.json();
     isLoading = true;
     error = null;
     try {
-      application = {
-        applicationActionHash: "uhCkk_mock_application_" + Date.now(),
-        lobbyAgentPubKey: "uhCAk_mock_lobby_agent",
-        data,
-        submitted_at: Date.now()
+      claimsData = data;
+      // Mocked spec-shaped response: hc_auth_approval returns
+      // status: "pending" with a single challenge of type
+      // "hc_auth_approval", description "Awaiting approval".
+      joinSession = {
+        session: "js_mock_" + Date.now().toString(36),
+        status: "pending",
+        challenges: [
+          {
+            id: "ch_hc_approval_1",
+            type: "hc_auth_approval",
+            description: "Awaiting community approval",
+            completed: false
+          }
+        ],
+        poll_interval_ms: 2000
       };
-      status = "lobby-pending";
+      status = "join-pending";
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to submit application.";
+      error = err instanceof Error ? err.message : "Failed to submit join request.";
       status = "unknown";
     } finally {
       isLoading = false;
     }
   }
 
-  async function beginBinding(): Promise<void> {
-    // MOCK: Sig 3 — user's conductor generates new member AgentID, commits
-    // LobbyOrigin + RulesAttestation to main DHT.
-    // Real implementation: callZome to main DNA "bind_member" with membrane proof,
-    // which triggers conductor keypair generation and atomic cross-DHT commit.
+  async function pollSessionStatus(): Promise<void> {
+    // MOCK: Real implementation calls:
+    //   const res = await fetch(`${SERVICE_URL}/v1/join/${joinSession.session}/status`);
+    //   const updated = await res.json();
+    //   joinSession = { ...joinSession, ...updated };
+    //   if (updated.status === "ready") status = "join-ready";
+    //   if (updated.status === "rejected") status = "join-rejected";
     isLoading = true;
     error = null;
-    status = "binding-in-progress";
     try {
-      // Simulate keypair generation latency.
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      if (!application || !approval || !currentRules) {
-        throw new Error("Cannot bind without application, approval, and current rules.");
+      if (!joinSession) throw new Error("No active join session to poll.");
+      // For mock: no-op. __setStatusForDemo drives transitions in demo mode.
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Failed to poll session status.";
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  async function fetchProvision(): Promise<void> {
+    // MOCK: Real implementation calls:
+    //   const res = await fetch(`${SERVICE_URL}/v1/join/${joinSession.session}/provision`);
+    //   joinProvision = await res.json();
+    //   // Then: install the hApp via conductor admin API, passing
+    //   // membrane_proofs from joinProvision into install-app
+    //   // roles-settings (per CLI.md). genesis_self_check validates
+    //   // the proof against the DNA progenitor at install time.
+    isLoading = true;
+    error = null;
+    status = "provisioning";
+    try {
+      if (!joinSession || joinSession.status !== "ready") {
+        throw new Error("Cannot fetch provision: session is not ready.");
       }
-      binding = {
-        lobbyApplicationActionHash: application.applicationActionHash,
-        provenance: "lobby",
-        rules_version: currentRules.version,
-        rules_document_hash: currentRules.document_hash,
-        bound_at: Date.now()
+      // Simulate fetch + install latency.
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      joinProvision = {
+        membrane_proofs: {
+          uhC0k_mock_requests_offers_dna_hash: "gqNzaWdtb2NrLW1lbWJyYW5lLXByb29mLXBheWxvYWQ="
+        },
+        happ_bundle_url: "https://example.org/requests-and-offers.happ",
+        dna_modifiers: {
+          network_seed: "ro-mainnet-2026"
+        }
       };
-      userLastAttestedVersion = currentRules.version;
       memberStatus = {
         status_type: "accepted",
         created_at: Date.now(),
         updated_at: Date.now()
       };
+      // Post-install: rules attestation happens before reaching authenticated.
+      userLastAttestedVersion = currentRules?.version ?? null;
       status = "binding-needs-password";
     } catch (err) {
-      error = err instanceof Error ? err.message : "Binding failed.";
-      status = "lobby-approved"; // back to retry-able state
+      error = err instanceof Error ? err.message : "Provisioning failed.";
+      // Rollback to retry-able state.
+      status = "join-ready";
     } finally {
       isLoading = false;
     }
@@ -360,8 +525,10 @@ export function useJoiningGuard(options: UseJoiningGuardOptions = {}): UseJoinin
   }
 
   async function attestCurrentRules(): Promise<void> {
-    // MOCK: Sig 3.2 — commit new RulesAttestation referencing current rules hash.
-    // Real implementation: callZome to main DNA "attest_rules" with version + hash.
+    // MOCK: R&O-internal, post-membership.
+    // Real implementation: callZome to R&O main coordinator, commits a
+    // RulesAttestation entry on the main DHT referencing the current
+    // rules document hash and version.
     isLoading = true;
     error = null;
     try {
@@ -377,12 +544,11 @@ export function useJoiningGuard(options: UseJoiningGuardOptions = {}): UseJoinin
 
   async function retry(): Promise<void> {
     // MOCK: re-run state detection.
+    // Real implementation: check lair status, poll joining-service if a
+    // session exists, query main R&O DHT for member + rules state.
     isLoading = true;
     error = null;
     try {
-      // In real implementation: re-query lobby DHT, main DHT, lair status.
-      // For demo, retry on "unknown" returns to whatever the FAB last set,
-      // or "unauthenticated" if nothing has been set.
       if (status === "unknown") status = "unauthenticated";
     } finally {
       isLoading = false;
@@ -393,9 +559,9 @@ export function useJoiningGuard(options: UseJoiningGuardOptions = {}): UseJoinin
     isLoading = false;
     error = null;
     status = "unauthenticated";
-    application = null;
-    approval = null;
-    binding = null;
+    claimsData = null;
+    joinSession = null;
+    joinProvision = null;
     memberStatus = null;
     userLastAttestedVersion = null;
   }
@@ -404,10 +570,10 @@ export function useJoiningGuard(options: UseJoiningGuardOptions = {}): UseJoinin
     newStatus: JoiningStatus,
     opts: { memberStatus?: StatusInDHT } = {}
   ): void {
-    // Demo escape hatch for the FAB control. Sets status and optionally seeds
-    // member-status mock data for the member-suspended screen.
-    // Setting to "unauthenticated" also clears application/binding state so
-    // the demo can be re-run cleanly without F5'ing the browser.
+    // Demo escape hatch for the FAB control. Sets status and optionally
+    // seeds member-status mock data for the member-suspended screen.
+    // Setting to "unauthenticated" also clears session state so the
+    // demo can be re-run cleanly without F5'ing the browser.
     if (newStatus === "unauthenticated") {
       reset();
       return;
@@ -418,51 +584,75 @@ export function useJoiningGuard(options: UseJoiningGuardOptions = {}): UseJoinin
       memberStatus = opts.memberStatus ?? MOCK_SUSPENDED_TEMP;
     }
     if (newStatus === "rules-stale") {
-      // Mock: user is on an older rules version than current.
       userLastAttestedVersion = "0.9.0";
     }
-    // Statuses that require application + approval already on hand:
-    // when the demo jumps directly to one of these, seed the prior Sig 1
-    // and Sig 2 records so beginBinding()'s guard doesn't throw.
-    const needsPriorSigs: JoiningStatus[] = [
-      "lobby-approved",
-      "binding-in-progress",
+    // Statuses that imply a session + (sometimes) provision is already
+    // on hand: seed the prior state so direct jumps in the demo do not
+    // throw.
+    const needsSession: JoiningStatus[] = [
+      "join-pending",
+      "join-rejected",
+      "join-ready",
+      "provisioning",
       "binding-needs-password",
       "instance-locked",
       "member-suspended",
       "rules-stale",
       "authenticated"
     ];
-    if (needsPriorSigs.includes(newStatus)) {
-      if (!application) {
-        application = {
-          applicationActionHash: "uhCkk_mock_application_action_hash",
-          lobbyAgentPubKey: "uhCAk_mock_lobby_agent_pub_key",
-          submitted_at: Date.parse("2026-05-15T10:00:00Z"),
-          data: {
-            givenName: "Sam",
-            familyName: "Turner",
-            nickname: "sam",
-            email: "sam@example.org",
-            userType: "creator",
-            reason: "Mutual-aid practitioner exploring sovereign infrastructure."
-          }
+    if (needsSession.includes(newStatus)) {
+      if (!claimsData) claimsData = MOCK_CLAIMS_DATA;
+      if (!joinSession) {
+        const sessionStatus: JoinStatus =
+          newStatus === "join-rejected"
+            ? "rejected"
+            : newStatus === "join-pending"
+              ? "pending"
+              : "ready";
+        joinSession = {
+          session: "js_mock_demo",
+          status: sessionStatus,
+          ...(newStatus === "join-rejected"
+            ? { reason: "Application not accepted at this time." }
+            : newStatus === "join-pending"
+              ? {
+                  challenges: [
+                    {
+                      id: "ch_hc_approval_demo",
+                      type: "hc_auth_approval",
+                      description: "Awaiting community approval",
+                      completed: false
+                    }
+                  ],
+                  poll_interval_ms: 2000
+                }
+              : {})
         };
       }
-      if (!approval) {
-        approval = {
-          applicationActionHash: "uhCkk_mock_application_action_hash",
-          membraneProofHash: "uhCAk_mock_membrane_proof_hash",
-          approved_at: Date.parse("2026-05-17T14:30:00Z")
-        };
-      }
+    }
+    const needsProvision: JoiningStatus[] = [
+      "binding-needs-password",
+      "instance-locked",
+      "member-suspended",
+      "rules-stale",
+      "authenticated"
+    ];
+    if (needsProvision.includes(newStatus) && !joinProvision) {
+      joinProvision = {
+        membrane_proofs: {
+          uhC0k_mock_requests_offers_dna_hash: "gqNzaWdtb2NrLW1lbWJyYW5lLXByb29mLXBheWxvYWQ="
+        },
+        happ_bundle_url: "https://example.org/requests-and-offers.happ",
+        dna_modifiers: { network_seed: "ro-mainnet-2026" }
+      };
     }
   }
 
   // ---- lifecycle ----
   if (autoCheck) {
-    // In real implementation: querying DHTs to determine starting status.
-    // For mock: no-op, defaults to "unauthenticated".
+    // Real implementation: query lair status + active joining-service
+    // session (if cached) + main R&O DHT member state. For mock: no-op,
+    // defaults to "unauthenticated".
   }
 
   // ---- return ----
@@ -479,14 +669,14 @@ export function useJoiningGuard(options: UseJoiningGuardOptions = {}): UseJoinin
     get nextRoute() {
       return nextRoute;
     },
-    get application() {
-      return application;
+    get claimsData() {
+      return claimsData;
     },
-    get approval() {
-      return approval;
+    get joinSession() {
+      return joinSession;
     },
-    get binding() {
-      return binding;
+    get joinProvision() {
+      return joinProvision;
     },
     get memberStatus() {
       return memberStatus;
@@ -497,8 +687,9 @@ export function useJoiningGuard(options: UseJoiningGuardOptions = {}): UseJoinin
     get userLastAttestedVersion() {
       return userLastAttestedVersion;
     },
-    submitApplication,
-    beginBinding,
+    submitJoinRequest,
+    pollSessionStatus,
+    fetchProvision,
     setInstancePassword,
     skipInstancePassword,
     unlockInstance,

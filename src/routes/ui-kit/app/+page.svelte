@@ -193,7 +193,7 @@
 
   // ── Joining flow composable (Layer 0/1) ────────────────────────────────────
   // Wave 1 of Phase 4d. Drives routing through the joining lifecycle.
-  // See src/lib/guards/useJoiningGuard.svelte.ts for the three-sig protocol.
+  // See src/lib/guards/useJoiningGuard.svelte.ts for the joining-service flow (hc_auth_approval).
   import { useJoiningGuard, type JoiningStatus } from '$lib/guards/useJoiningGuard.svelte';
 
   const joining = useJoiningGuard();
@@ -244,10 +244,10 @@
 
   // ── Wave 2 screen handlers ────────────────────────────────────────────────
 
-  // join-form submit — commits Sig 1 (LobbyApplication to lobby DHT in real impl).
-  // Required fields (marked * in UI): givenName, nickname, email, userType.
+  // join-form submit — POST /v1/join with agent_key + claims (joining-service in real impl).
+  // Required fields (marked * in UI): x_given_name, x_nickname, email, x_user_type.
   // Family name is optional iff mononym (handled via "." sentinel on submit).
-  // Reason is optional in the spec.
+  // x_introduction is optional in the spec.
   let jCanSubmit = $derived(
     jGivenName.trim() !== '' &&
     jNickname.trim() !== '' &&
@@ -274,15 +274,15 @@
 
   async function handleJoinFormSubmit() {
     if (!jCanSubmit) return;
-    await joining.submitApplication({
-      givenName: jGivenName,
-      familyName: jFamilyName.trim() === '' ? '.' : jFamilyName,
-      nickname: jNickname,
+    await joining.submitJoinRequest({
       email: jEmail,
-      userType: jUserType,
-      reason: jReason,
+      x_given_name: jGivenName,
+      x_family_name: jFamilyName.trim() === '' ? '.' : jFamilyName,
+      x_nickname: jNickname,
+      x_user_type: jUserType,
+      x_introduction: jReason,
     });
-    // $effect auto-routes to join-pending on lobby-pending status.
+    // $effect auto-routes to join-pending on join-pending status.
   }
 
   // join-set-password fields. Confirm field prevents typos becoming
@@ -367,7 +367,7 @@
     }
   }
 
-  // join-approved (three-sig binding ceremony)
+  // join-approved (provisioning: fetch membrane proof + community-agreements attestation)
   let approveHasScrolled = $state(false);
   let approveAccepted    = $state(false);
 
@@ -380,10 +380,10 @@
 
   async function handleSignAndJoin() {
     if (!approveHasScrolled || !approveAccepted) return;
-    await joining.beginBinding();
+    await joining.fetchProvision();
     // On success: composable transitions to 'binding-needs-password' and the
     // route-on-transition $effect auto-routes to 'join-set-password'.
-    // On failure: composable returns to 'lobby-approved' with joining.error set;
+    // On failure: composable returns to 'join-ready' with joining.error set;
     // the screen recalls naturally and shows the error block.
     // No explicit navigate() needed here.
   }
@@ -764,14 +764,9 @@
         <h2 class="ds-h3 join-pending-status">Application sent</h2>
         <p class="ds-p">
           Your application will be reviewed in the next 48 hours. Keep an eye on your email
-          inbox at <strong>{joining.application?.data.email ?? 'the address you provided'}</strong>
+          inbox at <strong>{joining.claimsData?.email ?? 'the address you provided'}</strong>
           — we will let you know there when you can join the Requests &amp; Offers — Holochain Ecosystem network.
         </p>
-        {#if joining.application}
-          <p class="ds-small join-meta">
-            Submitted {new Date(joining.application.submitted_at).toLocaleString()}
-          </p>
-        {/if}
       </div>
 
       {@render scoreboard()}
@@ -808,7 +803,7 @@
       </div>
     </div>
 
-  <!-- ── JOIN APPROVED ── lobby-approved + binding-in-progress; Sig 3 ceremony ── -->
+  <!-- ── JOIN APPROVED ── join-ready + provisioning; agreements + provision ── -->
   {:else if route === 'join-approved'}
     <div class="centered-screen">
       <div class="join-card join-card--wide">
@@ -1032,7 +1027,7 @@
       </div>
     </div>
 
-  <!-- ── JOIN FORM ── application form (Sig 1 payload) ── -->
+  <!-- ── JOIN FORM ── claims form (POST /v1/join payload) ── -->
   {:else if route === 'join-form'}
     <div class="join-form-page">
       <div class="join-form-nav">
@@ -1573,8 +1568,8 @@
 
         Welcome-header identity:
           In production, this should come from useUserAccessGuard.currentUser,
-          which reflects the post-Sig-3 UserProfile entry on the member source
-          chain. For the mockup we read joining.application?.data as a proxy
+          which reflects the post-membership UserProfile entry on the member source
+          chain. For the mockup we read joining.claimsData as a proxy
           since the composable seeds it via __setStatusForDemo. The ME constant
           remains as the data-graph anchor for REQUESTS/OFFERS counts until the
           mock graph is re-wired around useUserAccessGuard.
@@ -1587,7 +1582,7 @@
         design-system housekeeping task for after the show-and-tell.
       -->
       <div class="banner">
-        <h2>Hello {joining.application?.data.nickname ?? joining.application?.data.givenName ?? ME.nickname}</h2>
+        <h2>Hello {joining.claimsData?.x_nickname ?? joining.claimsData?.x_given_name ?? ME.nickname}</h2>
         <p>
           {REQUESTS.filter(r=>r.creator.id===ME.id&&r.status==='active').length} active requests
           · {OFFERS.filter(o=>o.creator.id===ME.id&&o.status==='active').length} active offers
@@ -2476,10 +2471,10 @@
     onchange={(e) => setDemoStatus((e.target as HTMLSelectElement).value as JoiningStatus)}
   >
     <option value="unauthenticated">unauthenticated</option>
-    <option value="lobby-pending">lobby-pending</option>
-    <option value="lobby-rejected">lobby-rejected</option>
-    <option value="lobby-approved">lobby-approved</option>
-    <option value="binding-in-progress">binding-in-progress</option>
+    <option value="join-pending">join-pending</option>
+    <option value="join-rejected">join-rejected</option>
+    <option value="join-ready">join-ready</option>
+    <option value="provisioning">provisioning</option>
     <option value="binding-needs-password">binding-needs-password</option>
     <option value="instance-locked">instance-locked</option>
     <option value="member-suspended">member-suspended</option>
@@ -3435,7 +3430,7 @@
   }
 
   /* ==========================================================================
-     Wave 3c — join-approved (three-sig binding ceremony)
+     Wave 3c — join-approved (provisioning + agreements attestation)
      Reuses .reattest-rules-container, .reattest-scroll-hint,
      .reattest-checkbox-row, .reattest-checkbox-label from Wave 3b.
      ========================================================================== */
