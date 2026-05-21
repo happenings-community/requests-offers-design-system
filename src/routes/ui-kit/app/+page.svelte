@@ -198,12 +198,25 @@
 
   const joining = useJoiningGuard();
 
-  // Auto-route when the composable's nextRoute changes, but ONLY while the
-  // user is still in the joining lifecycle. Once status === 'authenticated',
-  // we let the user navigate freely from home.
+  // Route on status TRANSITIONS, not on the present state of status. The
+  // composable owns "what state are you in"; the user owns "what screen am
+  // I looking at within that state". Earlier wiring re-routed every time the
+  // user navigated, which fought against in-state navigation (e.g. clicking
+  // "Join the community" on join-welcome while status stays unauthenticated).
+  //
+  // Initial mount: route once to whatever the composable says, then track
+  // transitions from there.
+  let lastJoiningStatus = $state<JoiningStatus | null>(null);
   $effect(() => {
-    if (joining.status !== 'authenticated' && joining.nextRoute !== route) {
-      navigate(joining.nextRoute);
+    if (lastJoiningStatus === null) {
+      // First mount — route to the composable's initial nextRoute.
+      lastJoiningStatus = joining.status;
+      if (joining.nextRoute !== route) navigate(joining.nextRoute);
+      return;
+    }
+    if (joining.status !== lastJoiningStatus) {
+      lastJoiningStatus = joining.status;
+      if (joining.nextRoute !== route) navigate(joining.nextRoute);
     }
   });
 
@@ -227,6 +240,93 @@
   function setDemoStatus(s: JoiningStatus) {
     demoStatus = s;
     joining.__setStatusForDemo(s);
+  }
+
+  // ── Wave 2 screen handlers ────────────────────────────────────────────────
+
+  // join-form submit — commits Sig 1 (LobbyApplication to lobby DHT in real impl).
+  // Required fields (marked * in UI): givenName, nickname, email, userType.
+  // Family name is optional iff mononym (handled via "." sentinel on submit).
+  // Reason is optional in the spec.
+  let jCanSubmit = $derived(
+    jGivenName.trim() !== '' &&
+    jNickname.trim() !== '' &&
+    jEmail.trim() !== '' &&
+    jEmail.includes('@') &&
+    jEmail.length > 3
+  );
+
+  // List which required fields are missing — surfaced as a banner once the
+  // user has begun engaging with the form.
+  let jMissingFields = $derived.by(() => {
+    const missing: string[] = [];
+    if (jGivenName.trim() === '') missing.push('Given Name');
+    if (jNickname.trim() === '') missing.push('Nickname');
+    if (jEmail.trim() === '') missing.push('Email Address');
+    else if (!jEmail.includes('@') || jEmail.length <= 3) missing.push('a valid Email Address');
+    return missing;
+  });
+  // Form is "touched" once any field has had content.
+  let jTouched = $derived(
+    jGivenName !== '' || jFamilyName !== '' || jNickname !== '' ||
+    jEmail !== '' || jReason !== ''
+  );
+
+  async function handleJoinFormSubmit() {
+    if (!jCanSubmit) return;
+    await joining.submitApplication({
+      givenName: jGivenName,
+      familyName: jFamilyName.trim() === '' ? '.' : jFamilyName,
+      nickname: jNickname,
+      email: jEmail,
+      userType: jUserType,
+      reason: jReason,
+    });
+    // $effect auto-routes to join-pending on lobby-pending status.
+  }
+
+  // join-set-password fields. Confirm field prevents typos becoming
+  // unrecoverable; matches PasswordSchema's likely "8 chars minimum".
+  let pwSet = $state('');
+  let pwSetConfirm = $state('');
+  let pwSetShow = $state(false);
+  let pwSetError = $derived.by(() => {
+    if (!pwSet) return null;
+    if (pwSet.length < 8) return 'Password must be at least 8 characters.';
+    if (pwSetConfirm && pwSet !== pwSetConfirm) return 'Passwords do not match.';
+    return null;
+  });
+  // Mock flag: in real impl this comes from Kangaroo config (passwordMode).
+  // Toggled here to false to demo the skip-block; flip during architecture review.
+  const passwordModeOptional = true;
+
+  async function handleSetPassword() {
+    if (pwSetError || !pwSet || pwSet !== pwSetConfirm) return;
+    await joining.setInstancePassword(pwSet);
+    if (joining.status === 'authenticated' && !joining.error) {
+      navigate('home');
+    }
+  }
+
+  async function handleSkipPassword() {
+    await joining.skipInstancePassword();
+    if (joining.status === 'authenticated' && !joining.error) {
+      navigate('home');
+    }
+  }
+
+  // password-gate
+  let pgShow = $state(false);
+  let pgForgottenOpen = $state(false);
+
+  async function handleUnlock() {
+    await joining.unlockInstance(pgEmail, pgPassword);
+    if (joining.status === 'authenticated' && !joining.error) {
+      navigate('home');
+    } else {
+      // Failed unlock — clear password field, keep email, let user retry.
+      pgPassword = '';
+    }
   }
 </script>
 
@@ -621,6 +721,248 @@
         </div>
       </div>
     </div>
+
+  <!-- ── JOIN FORM ── application form (Sig 1 payload) ── -->
+  {:else if route === 'join-form'}
+    <div class="join-form-page">
+      <div class="join-form-nav">
+        <button class="btn-ghost" onclick={() => navigate('join-welcome')}>← Back</button>
+      </div>
+      <h1 class="ds-h2 join-form-title">Apply to join</h1>
+      <p class="ds-p join-form-intro">
+        Hello! We are on the second round of our Alpha Test for Requests &amp; Offers — a mutual-aid app powered by Holochain.
+        Tell us a bit about yourself and an admin will be in touch soon.
+      </p>
+      <form class="form-card join-form-card" onsubmit={(e) => e.preventDefault()}>
+        <p class="ds-small form-note">* required fields</p>
+
+        <div class="form-row-2">
+          <div class="field">
+            <label class="field-label">Given Name *</label>
+            <input class="ds-input" bind:value={jGivenName} placeholder="e.g. Sam"/>
+            <span class="field-hint">Use your real name, it helps trust develop in our mutual aid networks. Once approved your name cannot be changed.</span>
+          </div>
+          <div class="field">
+            <label class="field-label">Family Name{jIsMononym ? '' : ' *'}</label>
+            <input class="ds-input" bind:value={jFamilyName} placeholder={jIsMononym ? '(mononymous)' : 'e.g. Turner'}/>
+            <span class="field-hint">Leave blank or enter "." if you are mononymous.</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Nickname *</label>
+          <input class="ds-input" bind:value={jNickname} placeholder="@handle"/>
+          <span class="field-hint">Share a nickname you might use within the ecosystem. It can be changed at a later date.</span>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Email Address *</label>
+          <input type="email" class="ds-input" bind:value={jEmail} placeholder="you@example.com"/>
+          <span class="field-hint">We will use this to let you know when your application is reviewed.</span>
+        </div>
+
+        <div class="form-card-section">
+          <label class="field-label">I am joining as *</label>
+          <div class="radio-group">
+            <label class="radio-opt">
+              <input type="radio" name="j-type" value="advocate" bind:group={jUserType}/>
+              <span><strong>A Holochain Advocate</strong> — a contributor (regardless of technical ability) who wants to support the broader vision of Holochain and Holo.</span>
+            </label>
+            <label class="radio-opt">
+              <input type="radio" name="j-type" value="creator" bind:group={jUserType}/>
+              <span><strong>A Creator</strong> — an individual developer, designer, etc. and/or someone who wants to build on their ideas to create Holochain applications, developer tools, libraries / zomes and other Holochain projects.</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">What brings you here?</label>
+          <textarea class="ds-input" rows="4" bind:value={jReason} placeholder="Let us know why you would like to participate in Requests and Offers!"></textarea>
+        </div>
+
+        {#if joining.error}
+          <p class="ds-small join-error">{joining.error}</p>
+        {/if}
+
+        {#if jTouched && jMissingFields.length > 0}
+          <p class="ds-small form-missing-hint">
+            Still needed: {jMissingFields.join(', ')}
+          </p>
+        {/if}
+
+        <div class="form-actions">
+          <button type="button" class="btn-ghost" onclick={() => navigate('join-welcome')}>Cancel</button>
+          <button
+            type="button"
+            class="btn-ds btn-ds--primary"
+            class:btn-ds--disabled={!jCanSubmit}
+            disabled={!jCanSubmit}
+            onclick={handleJoinFormSubmit}
+          >
+            ✨ Submit application
+          </button>
+        </div>
+      </form>
+    </div>
+
+  <!-- ── JOIN SET PASSWORD ── post-Sig-3, encrypts the new lair keystore ── -->
+  {:else if route === 'join-set-password'}
+    <div class="centered-screen">
+      <div class="join-card join-card--wide join-card--compact">
+        <h1 class="ds-h3 setpw-title">Set a password for this device</h1>
+        <p class="ds-small setpw-subhead">
+          This encrypts your keys on this device — only on this device.
+        </p>
+        <p class="ds-small setpw-body">
+          Your password unlocks the encrypted keystore on this computer when you reopen the app.
+          Choose one you will remember or <strong>save it in a password manager now</strong> — we cannot reset it for you.
+        </p>
+        <div class="form-card-section pw-form">
+          <div class="field">
+            <label class="field-label">Password</label>
+            <div class="pw-input-wrap">
+              <input
+                type={pwSetShow ? 'text' : 'password'}
+                class="ds-input"
+                bind:value={pwSet}
+                placeholder="At least 8 characters"
+                autocomplete="new-password"
+              />
+              <button type="button" class="pw-toggle" onclick={() => pwSetShow = !pwSetShow}>
+                {pwSetShow ? '🙈' : '👁️'}
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Confirm password</label>
+            <input
+              type={pwSetShow ? 'text' : 'password'}
+              class="ds-input"
+              bind:value={pwSetConfirm}
+              placeholder="Type it again"
+              autocomplete="new-password"
+            />
+          </div>
+          {#if pwSetError}
+            <p class="ds-small join-error">{pwSetError}</p>
+          {/if}
+        </div>
+
+        <!-- Serious warning — read this before submitting the password. -->
+        <div class="pw-warning" role="note">
+          <div class="pw-warning-icon" aria-hidden="true">⚠️</div>
+          <div class="pw-warning-body">
+            <p class="pw-warning-title">If you lose this password</p>
+            <p class="pw-warning-text">
+              We cannot recover it for you. Your keys are encrypted on this device with this password
+              and we do not have a copy. You would need to submit a new onboarding form to access
+              Requests &amp; Offers with a new profile.
+            </p>
+          </div>
+        </div>
+
+        <div class="join-actions">
+          <button
+            type="button"
+            class="btn-ds btn-ds--primary"
+            disabled={!pwSet || !!pwSetError || pwSet !== pwSetConfirm}
+            onclick={handleSetPassword}
+          >
+            🔑 Set password and continue
+          </button>
+        </div>
+
+        {#if passwordModeOptional}
+          <div class="pw-skip-block">
+            <h3 class="ds-h4" style="margin: 0 0 8px">Or skip this step</h3>
+            <p class="ds-small" style="color: rgb(var(--fg-2))">
+              You can use Requests &amp; Offers without a password on this device. Your keys will still be stored
+              on this computer, but anyone with access to the computer could open the app as you.
+              <strong>You cannot add a password later without re-onboarding.</strong>
+            </p>
+            <button type="button" class="btn-ghost btn-ghost--sm" onclick={handleSkipPassword}>
+              Skip — open R&amp;O without a password
+            </button>
+          </div>
+        {/if}
+      </div>
+    </div>
+
+  <!-- ── PASSWORD GATE ── returning-user unlock (Layer 1 instance protection) ── -->
+  {:else if route === 'password-gate'}
+    <div class="centered-screen">
+      <div class="join-card">
+        <h1 class="ds-h2">Welcome back</h1>
+        <h2 class="ds-h3" style="text-align: center; margin: 0; color: rgb(var(--fg-1))">
+          Unlock Requests &amp; Offers on this device.
+        </h2>
+        <p class="ds-small" style="text-align: center; color: rgb(var(--fg-3)); margin: 4px 0 0">
+          You set this password when you first joined. It encrypts your keys on this device.
+        </p>
+        <form onsubmit={(e) => { e.preventDefault(); handleUnlock(); }} class="pg-form">
+          <div class="field">
+            <label class="field-label">Email address</label>
+            <input
+              type="email"
+              class="ds-input"
+              bind:value={pgEmail}
+              placeholder="The one you used to apply"
+              autocomplete="username email"
+            />
+          </div>
+          <div class="field">
+            <label class="field-label">Your password</label>
+            <div class="pw-input-wrap">
+              <input
+                type={pgShow ? 'text' : 'password'}
+                class="ds-input"
+                bind:value={pgPassword}
+                autocomplete="current-password"
+              />
+              <button type="button" class="pw-toggle" onclick={() => pgShow = !pgShow}>
+                {pgShow ? '🙈' : '👁️'}
+              </button>
+            </div>
+          </div>
+          {#if joining.error}
+            <p class="ds-small join-error">That email and password did not unlock Requests &amp; Offers.</p>
+          {/if}
+          <button type="submit" class="btn-ds btn-ds--primary" disabled={!pgEmail || !pgPassword}>
+            🔓 Unlock
+          </button>
+        </form>
+        <button type="button" class="btn-ghost btn-ghost--sm pg-forgotten" onclick={() => pgForgottenOpen = true}>
+          Forgotten your password?
+        </button>
+      </div>
+    </div>
+
+    {#if pgForgottenOpen}
+      <div class="modal-backdrop" onclick={() => pgForgottenOpen = false}>
+        <div class="modal-panel modal-panel--compact" onclick={(e) => e.stopPropagation()}>
+          <button class="modal-close" onclick={() => pgForgottenOpen = false} aria-label="Close">✕</button>
+          <div class="modal-header">
+            <h2 class="ds-h3" style="margin: 0">Forgotten your password?</h2>
+          </div>
+          <div class="modal-body">
+            <p class="ds-p">
+              Check the password is correct, and check your password manager — most often it is a typo.
+            </p>
+            <p class="ds-p">
+              If you have genuinely lost the password, we cannot recover it. Your keys are encrypted on this device
+              with your password, and we do not have a copy. Your previous activity on this device cannot be recovered.
+            </p>
+            <p class="ds-p">
+              Please email <a href="mailto:info@happenings.community">info@happenings.community</a> — we can re-start
+              the Requests &amp; Offers onboarding process for you.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn-ds btn-ds--primary" onclick={() => pgForgottenOpen = false}>Got it</button>
+          </div>
+        </div>
+      </div>
+    {/if}
 
   {:else if route === 'home'}
     <div class="page">
@@ -1986,6 +2328,188 @@
     .scoreboard-cols { grid-template-columns: 1fr; }
     .join-page { padding: 16px 16px 24px; }
   }
+
+  /* ════════════════════════════════════════════════════════════════
+     WAVE 2 — additional patterns for set-password + password-gate
+     ════════════════════════════════════════════════════════════════ */
+
+  /* Wider variant of join-card for set-password (needs room for two pw fields + skip block). */
+  .join-card--wide { max-width: 640px; }
+
+  /* Body-text block inside a join-card — left-aligned, tighter rhythm. */
+  .join-body-block {
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .join-body-block .ds-p { margin: 0; }
+
+  /* Password-entry pattern: input + show/hide toggle button overlay. */
+  .pw-input-wrap { position: relative; }
+  .pw-input-wrap .ds-input { padding-right: 44px; }
+  .pw-toggle {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 6px 8px;
+    font-size: 16px;
+    line-height: 1;
+    border-radius: 6px;
+  }
+  .pw-toggle:hover { background: rgb(var(--bg-muted)); }
+
+  /* Two-field password form spacing. */
+  .pw-form { display: flex; flex-direction: column; gap: 12px; }
+
+  /* Skip block on set-password — visually distinct, less weight. */
+  .pw-skip-block {
+    margin-top: 8px;
+    padding: 16px;
+    background: rgb(var(--bg-muted));
+    border-radius: 12px;
+    border: 1px dashed rgb(var(--border-1));
+    text-align: left;
+  }
+  .pw-skip-block .ds-small { margin: 0 0 12px; }
+
+  /* Password-gate form layout. */
+  .pg-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 8px;
+  }
+  .pg-form .btn-ds { align-self: stretch; margin-top: 4px; }
+
+  /* Forgotten-password link, sits below the card. */
+  .pg-forgotten {
+    align-self: center;
+    margin-top: 12px;
+    color: rgb(var(--color-primary-600));
+  }
+
+  /* Backdrop for the forgotten-password modal (reuses existing modal-panel grammar). */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 24px;
+  }
+
+  /* ── Wave 2b — centered join-form + tighter set-password ───────────────── */
+
+  .join-form-page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px 24px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .join-form-nav { align-self: flex-start; }
+  .join-form-title { margin: 8px 0 4px; text-align: center; }
+  .join-form-intro { margin: 0 0 16px; color: rgb(var(--fg-2)); text-align: center; }
+  .join-form-card {
+    background: #fff;
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 16px;
+    box-shadow: var(--shadow-md);
+    padding: 28px;
+  }
+
+  /* Set-password — compact variant. */
+  .join-card--wide { padding: 20px 24px; gap: 10px; max-width: 640px; }
+  .join-card--compact { gap: 8px; padding: 16px 24px; }
+  .join-card--compact .ds-h2 { margin: 0; }
+  .setpw-title { margin: 0; text-align: center; }
+  .setpw-subhead { margin: 0; text-align: center; color: rgb(var(--fg-2)); }
+  .setpw-body {
+    text-align: left;
+    margin: 4px 0 0;
+    color: rgb(var(--fg-2));
+    line-height: 1.5;
+  }
+
+  /* Tighter form fields when inside a compact card. */
+  .join-card--compact .form-card-section { gap: 8px; }
+  .join-card--compact .field-label { margin-bottom: 4px; font-size: 13px; }
+
+  /* Compact skip block — outline only, smaller. */
+  .pw-skip-block {
+    margin-top: 2px;
+    padding: 10px 12px;
+    background: transparent;
+    border: 1px dashed rgb(var(--border-1));
+    border-radius: 10px;
+  }
+  .pw-skip-block .ds-h4 { font-size: 13px; margin: 0 0 4px; }
+  .pw-skip-block .ds-small { margin: 0 0 8px; font-size: 12px; }
+
+  /* Password-loss warning — icon scaled to button-height (~48px).
+     Chromatic identity matches Sacha's warning tokens. */
+  .pw-warning {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    background: rgb(var(--color-warning-50));
+    border: 1px solid rgb(var(--color-warning-300));
+    border-radius: 12px;
+    text-align: left;
+  }
+  .pw-warning-icon {
+    font-size: 44px;
+    line-height: 1;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pw-warning-body { flex: 1; min-width: 0; }
+  .pw-warning-title {
+    margin: 0 0 2px;
+    font: 600 14px/20px var(--font-base);
+    color: rgb(var(--fg-1));
+  }
+  .pw-warning-text {
+    margin: 0;
+    font: 400 13px/19px var(--font-base);
+    color: rgb(var(--fg-1));
+  }
+
+  /* Tighter action row spacing. */
+  .join-card--compact .join-actions { margin-top: 2px; }
+
+  /* Missing-required-fields hint above the join-form submit row. */
+  .form-missing-hint {
+    margin: 12px 0 4px;
+    padding: 8px 12px;
+    background: rgb(var(--color-warning-50));
+    border: 1px solid rgb(var(--color-warning-300));
+    border-radius: 8px;
+    color: rgb(var(--fg-1));
+    text-align: left;
+  }
+
+  /* Disabled state for primary button when required fields are missing.
+     btn-ds--primary doesn't ship with a visible :disabled treatment, so add one. */
+  .btn-ds--disabled,
+  .btn-ds:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+  .btn-ds--disabled:hover,
+  .btn-ds:disabled:hover { box-shadow: none; }
 
   /* Demo controls — fixed bottom-right, always visible. */
   .demo-controls {
