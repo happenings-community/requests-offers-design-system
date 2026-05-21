@@ -123,7 +123,7 @@ export type RulesVersion = {
   version: string; // semver
   document_hash: string;
   effective_from: number;
-  changelog: string; // bulleted changes from previous version
+  changelog: string[]; // bulleted changes from previous version
 };
 
 /** Action button shape (mirrors useUserAccessGuard.UserAccessAction). */
@@ -211,7 +211,11 @@ const MOCK_RULES_V1: RulesVersion = {
   version: "1.0.0",
   document_hash: "uhCAk_mock_rules_v1_hash",
   effective_from: Date.parse("2026-05-01T00:00:00Z"),
-  changelog: "Initial community agreements."
+  changelog: [
+    "Added explicit policy on respectful communication across cultural difference",
+    "Clarified the harassment reporting process",
+    "Added Consequences Ladder (Correction / Warning / Temporary Ban / Permanent Ban)"
+  ]
 };
 
 const MOCK_SUSPENDED_TEMP: StatusInDHT = {

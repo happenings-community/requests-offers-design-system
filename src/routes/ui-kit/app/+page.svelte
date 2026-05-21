@@ -329,6 +329,28 @@
     }
   }
 
+  // rules-reattestation
+  let reattestHasScrolled = $state(false);
+  let reattestAccepted    = $state(false);
+
+  function reattestOnScroll(e: Event) {
+    const el = e.currentTarget as HTMLElement;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 8) {
+      reattestHasScrolled = true;
+    }
+  }
+
+  async function handleSignAndContinue() {
+    if (!reattestHasScrolled || !reattestAccepted) return;
+    await joining.attestCurrentRules();
+    if (joining.status === 'authenticated' && !joining.error) {
+      // Reset local state so the screen is clean if revisited via demo controls.
+      reattestHasScrolled = false;
+      reattestAccepted = false;
+      navigate('home');
+    }
+  }
+
   // Demo-only: flip between temporary and indefinite suspension on member-suspended
   // so the show-and-tell can see both conditional renderings without re-routing.
   function setSuspensionForDemo(kind: 'temporary' | 'indefinite') {
@@ -1054,6 +1076,215 @@
             class="btn-ghost btn-ghost--sm"
             onclick={() => setSuspensionForDemo('indefinite')}
           >Indefinite</button>
+        </div>
+      </div>
+    </div>
+
+  {:else if route === 'rules-reattestation'}
+    <div class="centered-screen">
+      <div class="join-card join-card--wide">
+        <h1 class="ds-h2 reattest-heading">Our community agreements have been updated</h1>
+        <p class="ds-p reattest-intro">
+          Our community agreements have changed since you last signed. Your continued
+          participation in Requests &amp; Offers depends on reading the updated text
+          below and re-attesting that you commit to it.
+        </p>
+
+        {#if joining.currentRules && joining.userLastAttestedVersion}
+          <div class="reattest-versions">
+            <div class="reattest-version reattest-version--old">
+              <span class="reattest-version-label">You signed</span>
+              <span class="reattest-version-value">v{joining.userLastAttestedVersion}</span>
+            </div>
+            <div class="reattest-arrow" aria-hidden="true">→</div>
+            <div class="reattest-version reattest-version--new">
+              <span class="reattest-version-label">Current</span>
+              <span class="reattest-version-value">v{joining.currentRules.version}</span>
+            </div>
+          </div>
+
+          <p class="ds-small reattest-version-dates">
+            Current since {new Date(joining.currentRules.effective_from).toLocaleDateString(undefined, {
+              year: 'numeric', month: 'long', day: 'numeric'
+            })}
+          </p>
+
+          {#if joining.currentRules.changelog.length > 0}
+            <div class="reattest-changelog">
+              <p class="reattest-changelog-label">
+                What's changed since v{joining.userLastAttestedVersion}
+              </p>
+              <ul class="reattest-changelog-list">
+                {#each joining.currentRules.changelog as change}
+                  <li>{change}</li>
+                {/each}
+              </ul>
+            </div>
+          {/if}
+        {/if}
+
+        <div
+          class="reattest-rules-container"
+          class:reattest-rules-container--unread={!reattestHasScrolled}
+          onscroll={reattestOnScroll}
+          tabindex="0"
+          role="region"
+          aria-label="Updated community agreements"
+        >
+          <h2 class="ds-h3 reattest-rules-heading">Personal Responsibilities</h2>
+          <p class="ds-p">
+            The hAppenings.community collectively strives to foster an increasingly
+            open, inclusive and caring culture.
+          </p>
+          <p class="ds-p">
+            As community participants it is our responsibility to inhabit by these
+            Personal Conduct Guidelines to build a warm and welcoming environment
+            for us all:
+          </p>
+
+          <h3 class="ds-h4 reattest-rules-subheading">Respect diversity</h3>
+          <p class="ds-p">
+            We are committed to supporting social diversity and cultural sensitivity.
+            Please support our conduct standards in all interactions.
+          </p>
+
+          <h3 class="ds-h4 reattest-rules-subheading">Communicate gently</h3>
+          <p class="ds-p">
+            Participants are expected to support contemplative awareness and
+            nonviolent communication in our relationships. This is especially
+            important in online communications. Please consider other perspectives
+            in your interactions.
+          </p>
+
+          <h3 class="ds-h4 reattest-rules-subheading">Communicate effectively</h3>
+          <p class="ds-p">
+            Your voice is welcome. Your perspective is valued. Your interests are
+            interesting. The best thing you can do to give and receive value is
+            participate. Please consider the intended purpose of different
+            communication channels within our community and choose the appropriate
+            channel for different interactions.
+          </p>
+
+          <h3 class="ds-h4 reattest-rules-subheading">Discuss concerns and questions</h3>
+          <p class="ds-p">
+            If you feel uncomfortable or uncertain about our issues or processes,
+            please identify your concerns. You can do this publicly, or privately
+            by contacting one of the community admins or via email to
+            <a href="mailto:info@happenings.community">info@happenings.community</a>.
+          </p>
+
+          <h3 class="ds-h4 reattest-rules-subheading">Resolve conflicts inclusively</h3>
+          <p class="ds-p">
+            We commit to resolve conflicts inclusively using a Transformative
+            Justice approach, aiming to strengthen community and to fairly
+            recognise all serious concerns. We encourage all conflicts to be
+            resolved with the fewest people necessary, again acknowledging that
+            everyone directly affected by the conflict needs to be involved.
+          </p>
+
+          <h3 class="ds-h4 reattest-rules-subheading">Mutual responsibility</h3>
+          <p class="ds-p">
+            We're all responsible, all of the time, to take positive action in
+            response to harassment and abuse. In some instances, this may include
+            reporting to external authorities. Our community expects all
+            participants to take this responsibility seriously.
+          </p>
+
+          <h2 class="ds-h3 reattest-rules-heading">Our Standards</h2>
+          <p class="ds-p">
+            hAppenings.community is dedicated to providing a harassment-free
+            experience for everyone. We do not tolerate harassment of participants
+            in any form.
+          </p>
+          <p class="ds-p">
+            Participants are responsible for knowing and abiding by these rules.
+          </p>
+
+          <h3 class="ds-h4 reattest-rules-subheading">Harassment includes</h3>
+          <ul class="reattest-rules-list">
+            <li>
+              Offensive comments related to gender, gender identity and expression,
+              sexual orientation, disability, mental illness, neuro(a)typicality,
+              physical appearance, body size, age, race, class, or religion.
+            </li>
+            <li>
+              Unwelcome comments regarding a person's lifestyle choices and
+              practices, including those related to food, health, parenting,
+              drugs, and employment.
+            </li>
+            <li>Deliberate misgendering or use of 'dead' or rejected names.</li>
+            <li>
+              Gratuitous or off-topic sexual images or behaviour in spaces where
+              they're not appropriate.
+            </li>
+            <li>
+              Physical contact and simulated physical contact (e.g. textual
+              descriptions like "hug" or "backrub") without consent or after a
+              request to stop.
+            </li>
+            <li>Threats of violence.</li>
+            <li>
+              Incitement of violence towards any individual, including encouraging
+              a person to commit suicide or to engage in self-harm.
+            </li>
+            <li>Deliberate intimidation.</li>
+            <li>Stalking or following.</li>
+            <li>
+              Harassing photography or recording, including logging online activity
+              for harassment purposes.
+            </li>
+            <li>Sustained disruption of discussion.</li>
+            <li>Unwelcome sexual attention.</li>
+            <li>
+              Pattern of inappropriate social contact, such as requesting or
+              assuming inappropriate levels of intimacy with others.
+            </li>
+            <li>Continued one-on-one communication after requests to cease.</li>
+            <li>
+              Deliberate "outing" of any aspect of a person's identity without
+              their consent except as necessary to protect vulnerable people from
+              intentional abuse.
+            </li>
+            <li>Publication of non-harassing private communication.</li>
+          </ul>
+        </div>
+
+        {#if !reattestHasScrolled}
+          <p class="ds-small reattest-scroll-hint">
+            Please read to the end before agreeing.
+          </p>
+        {/if}
+
+        <label class="reattest-checkbox-row">
+          <input
+            type="checkbox"
+            class="ds-checkbox"
+            bind:checked={reattestAccepted}
+            disabled={!reattestHasScrolled}
+          />
+          <span class="reattest-checkbox-label" class:reattest-checkbox-label--disabled={!reattestHasScrolled}>
+            I have read the updated community agreements above and I commit to
+            participate accordingly.
+          </span>
+        </label>
+
+        {#if joining.error}
+          <p class="ds-small join-error">{joining.error}</p>
+        {/if}
+
+        <div class="join-actions">
+          <button
+            type="button"
+            class="btn-ds btn-ds--primary"
+            disabled={!reattestHasScrolled || !reattestAccepted || joining.isLoading}
+            onclick={handleSignAndContinue}
+          >
+            {#if joining.isLoading}
+              ⏳ Signing…
+            {:else}
+              ✍️ Sign and continue
+            {/if}
+          </button>
         </div>
       </div>
     </div>
@@ -2700,4 +2931,149 @@
     font-size: 14px;
   }
   .demo-controls-reset:hover { background: rgb(var(--bg-muted)); color: rgb(var(--fg-1)); }
+
+  /* ==========================================================================
+     Wave 3b — rules-reattestation
+     ========================================================================== */
+  .reattest-heading {
+    margin: 0 0 12px 0;
+  }
+  .reattest-intro {
+    margin: 0 0 20px 0;
+    color: rgb(var(--fg-2));
+  }
+
+  .reattest-versions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin: 8px 0 6px 0;
+  }
+  .reattest-version {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 18px;
+    border-radius: 12px;
+    border: 1px solid rgb(var(--border-1));
+    min-width: 96px;
+  }
+  .reattest-version--old {
+    background: rgb(var(--bg-muted));
+    color: rgb(var(--fg-3));
+  }
+  .reattest-version--new {
+    background: rgb(var(--color-secondary-50) / 0.18);
+    border-color: rgb(var(--color-secondary-50) / 0.5);
+    color: rgb(var(--fg-1));
+  }
+  .reattest-version-label {
+    font: 500 11px/1 var(--font-base);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .reattest-version-value {
+    font: 600 18px/1 var(--font-base);
+  }
+  .reattest-arrow {
+    font-size: 22px;
+    color: rgb(var(--fg-3));
+    font-weight: 300;
+  }
+  .reattest-version-dates {
+    text-align: center;
+    color: rgb(var(--fg-3));
+    margin: 0 0 20px 0;
+  }
+
+  .reattest-changelog {
+    background: rgb(var(--color-warning-50) / 0.12);
+    border-left: 3px solid rgb(var(--color-warning-50));
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 0 0 24px 0;
+  }
+  .reattest-changelog-label {
+    font: 600 13px/1.2 var(--font-base);
+    color: rgb(var(--fg-1));
+    margin: 0 0 8px 0;
+  }
+  .reattest-changelog-list {
+    margin: 0;
+    padding-left: 20px;
+    color: rgb(var(--fg-2));
+    font-size: 14px;
+  }
+  .reattest-changelog-list li {
+    margin: 4px 0;
+  }
+
+  .reattest-rules-container {
+    height: 360px;
+    overflow-y: auto;
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 10px;
+    padding: 18px 22px;
+    background: rgb(var(--bg-1));
+    transition: box-shadow 200ms ease;
+  }
+  .reattest-rules-container:focus {
+    outline: 2px solid rgb(var(--color-primary-50) / 0.5);
+    outline-offset: 2px;
+  }
+  .reattest-rules-container--unread {
+    box-shadow: inset 0 -32px 24px -24px rgb(var(--bg-muted));
+  }
+  .reattest-rules-heading {
+    margin: 0 0 12px 0;
+    color: rgb(var(--fg-1));
+  }
+  .reattest-rules-heading:not(:first-child) {
+    margin-top: 24px;
+  }
+  .reattest-rules-subheading {
+    margin: 16px 0 6px 0;
+    color: rgb(var(--fg-1));
+  }
+  .reattest-rules-list {
+    margin: 8px 0 0 0;
+    padding-left: 20px;
+    color: rgb(var(--fg-2));
+  }
+  .reattest-rules-list li {
+    margin: 6px 0;
+  }
+
+  .reattest-scroll-hint {
+    margin: 12px 0 0 0;
+    color: rgb(var(--color-warning-50));
+    text-align: center;
+    font-style: italic;
+  }
+
+  .reattest-checkbox-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 20px 0 0 0;
+    padding: 14px 16px;
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 10px;
+    background: rgb(var(--bg-1));
+    cursor: pointer;
+  }
+  .reattest-checkbox-row:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  .reattest-checkbox-label {
+    color: rgb(var(--fg-1));
+    line-height: 1.5;
+    font-size: 14px;
+  }
+  .reattest-checkbox-label--disabled {
+    color: rgb(var(--fg-3));
+  }
 </style>
