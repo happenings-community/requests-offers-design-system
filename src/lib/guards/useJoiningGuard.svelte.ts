@@ -421,6 +421,42 @@ export function useJoiningGuard(options: UseJoiningGuardOptions = {}): UseJoinin
       // Mock: user is on an older rules version than current.
       userLastAttestedVersion = "0.9.0";
     }
+    // Statuses that require application + approval already on hand:
+    // when the demo jumps directly to one of these, seed the prior Sig 1
+    // and Sig 2 records so beginBinding()'s guard doesn't throw.
+    const needsPriorSigs: JoiningStatus[] = [
+      "lobby-approved",
+      "binding-in-progress",
+      "binding-needs-password",
+      "instance-locked",
+      "member-suspended",
+      "rules-stale",
+      "authenticated"
+    ];
+    if (needsPriorSigs.includes(newStatus)) {
+      if (!application) {
+        application = {
+          applicationActionHash: "uhCkk_mock_application_action_hash",
+          lobbyAgentPubKey: "uhCAk_mock_lobby_agent_pub_key",
+          submitted_at: Date.parse("2026-05-15T10:00:00Z"),
+          data: {
+            givenName: "Sam",
+            familyName: "Turner",
+            nickname: "sam",
+            email: "sam@example.org",
+            userType: "creator",
+            reason: "Mutual-aid practitioner exploring sovereign infrastructure."
+          }
+        };
+      }
+      if (!approval) {
+        approval = {
+          applicationActionHash: "uhCkk_mock_application_action_hash",
+          membraneProofHash: "uhCAk_mock_membrane_proof_hash",
+          approved_at: Date.parse("2026-05-17T14:30:00Z")
+        };
+      }
+    }
   }
 
   // ---- lifecycle ----

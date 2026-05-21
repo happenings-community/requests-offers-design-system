@@ -351,6 +351,27 @@
     }
   }
 
+  // join-approved (three-sig binding ceremony)
+  let approveHasScrolled = $state(false);
+  let approveAccepted    = $state(false);
+
+  function approveOnScroll(e: Event) {
+    const el = e.currentTarget as HTMLElement;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 8) {
+      approveHasScrolled = true;
+    }
+  }
+
+  async function handleSignAndJoin() {
+    if (!approveHasScrolled || !approveAccepted) return;
+    await joining.beginBinding();
+    // On success: composable transitions to 'binding-needs-password' and the
+    // route-on-transition $effect auto-routes to 'join-set-password'.
+    // On failure: composable returns to 'lobby-approved' with joining.error set;
+    // the screen recalls naturally and shows the error block.
+    // No explicit navigate() needed here.
+  }
+
   // Demo-only: flip between temporary and indefinite suspension on member-suspended
   // so the show-and-tell can see both conditional renderings without re-routing.
   function setSuspensionForDemo(kind: 'temporary' | 'indefinite') {
@@ -771,6 +792,230 @@
       </div>
     </div>
 
+  <!-- ── JOIN APPROVED ── lobby-approved + binding-in-progress; Sig 3 ceremony ── -->
+  {:else if route === 'join-approved'}
+    <div class="centered-screen">
+      <div class="join-card join-card--wide">
+        <h1 class="ds-h2 approve-heading">You are in. Welcome aboard.</h1>
+        <div class="approve-subhead-emoji" aria-hidden="true">🤝</div>
+        <p class="approve-subhead">Glad to have you here.</p>
+
+        <ol class="approve-welcome-list">
+          <li>
+            <span class="approve-welcome-lead">Look around.</span>
+            See what other Creators and Advocates are offering and asking for —
+            your community is already in motion.
+          </li>
+          <li>
+            <span class="approve-welcome-lead">Set up your profile.</span>
+            We have kept what you told us — your name, email, and a starting
+            bio are ready for you to review and expand.
+          </li>
+          <li>
+            <span class="approve-welcome-lead">Post your first listing.</span>
+            Whether it is a skill you can Offer or a Request for collaboration
+            — both move the community.
+          </li>
+        </ol>
+
+        <div class="approve-agreements-section">
+          <p class="ds-p approve-agreements-intro approve-agreements-intro--bold">
+            Before you join, please read our community agreements. These are
+            the commitments we make to each other as a community. By joining,
+            you are cryptographically attesting that you have read and
+            accepted them — your signature on these agreements is part of
+            becoming a member.
+          </p>
+
+          <div
+            class="reattest-rules-container"
+            class:reattest-rules-container--unread={!approveHasScrolled}
+            onscroll={approveOnScroll}
+            tabindex="0"
+            role="region"
+            aria-label="Community agreements"
+          >
+            <h2 class="ds-h3 reattest-rules-heading">Personal Responsibilities</h2>
+            <p class="ds-p">
+              The hAppenings.community collectively strives to foster an
+              increasingly open, inclusive and caring culture.
+            </p>
+            <p class="ds-p">
+              As community participants it is our responsibility to inhabit by
+              these Personal Conduct Guidelines to build a warm and welcoming
+              environment for us all:
+            </p>
+
+            <h3 class="ds-h4 reattest-rules-subheading">Respect diversity</h3>
+            <p class="ds-p">
+              We are committed to supporting social diversity and cultural
+              sensitivity. Please support our conduct standards in all
+              interactions.
+            </p>
+
+            <h3 class="ds-h4 reattest-rules-subheading">Communicate gently</h3>
+            <p class="ds-p">
+              Participants are expected to support contemplative awareness and
+              nonviolent communication in our relationships. This is especially
+              important in online communications. Please consider other
+              perspectives in your interactions.
+            </p>
+
+            <h3 class="ds-h4 reattest-rules-subheading">Communicate effectively</h3>
+            <p class="ds-p">
+              Your voice is welcome. Your perspective is valued. Your interests
+              are interesting. The best thing you can do to give and receive
+              value is participate. Please consider the intended purpose of
+              different communication channels within our community and choose
+              the appropriate channel for different interactions.
+            </p>
+
+            <h3 class="ds-h4 reattest-rules-subheading">Discuss concerns and questions</h3>
+            <p class="ds-p">
+              If you feel uncomfortable or uncertain about our issues or
+              processes, please identify your concerns. You can do this
+              publicly, or privately by contacting one of the community admins
+              or via email to
+              <a href="mailto:info@happenings.community">info@happenings.community</a>.
+            </p>
+
+            <h3 class="ds-h4 reattest-rules-subheading">Resolve conflicts inclusively</h3>
+            <p class="ds-p">
+              We commit to resolve conflicts inclusively using a Transformative
+              Justice approach, aiming to strengthen community and to fairly
+              recognise all serious concerns. We encourage all conflicts to be
+              resolved with the fewest people necessary, again acknowledging
+              that everyone directly affected by the conflict needs to be
+              involved.
+            </p>
+
+            <h3 class="ds-h4 reattest-rules-subheading">Mutual responsibility</h3>
+            <p class="ds-p">
+              We're all responsible, all of the time, to take positive action
+              in response to harassment and abuse. In some instances, this may
+              include reporting to external authorities. Our community expects
+              all participants to take this responsibility seriously.
+            </p>
+
+            <h2 class="ds-h3 reattest-rules-heading">Our Standards</h2>
+            <p class="ds-p">
+              hAppenings.community is dedicated to providing a harassment-free
+              experience for everyone. We do not tolerate harassment of
+              participants in any form.
+            </p>
+            <p class="ds-p">
+              Participants are responsible for knowing and abiding by these
+              rules.
+            </p>
+
+            <p class="ds-p">Harassment includes:</p>
+
+            <h4 class="ds-small reattest-rules-group-heading">Communication and language</h4>
+            <ul class="reattest-rules-list">
+              <li>
+                Offensive comments related to gender, gender identity and
+                expression, sexual orientation, disability, mental illness,
+                neuro(a)typicality, physical appearance, body size, age, race,
+                class, or religion.
+              </li>
+              <li>
+                Unwelcome comments regarding a person's lifestyle choices and
+                practices, including those related to food, health, parenting,
+                drugs, and employment.
+              </li>
+              <li>Deliberate misgendering or use of 'dead' or rejected names.</li>
+            </ul>
+
+            <h4 class="ds-small reattest-rules-group-heading">Threats and disruption</h4>
+            <ul class="reattest-rules-list">
+              <li>Threats of violence.</li>
+              <li>
+                Incitement of violence towards any individual, including
+                encouraging a person to commit suicide or to engage in
+                self-harm.
+              </li>
+              <li>Stalking or following.</li>
+              <li>Sustained disruption of discussion.</li>
+            </ul>
+
+            <h4 class="ds-small reattest-rules-group-heading">Sexual content and unwelcome contact</h4>
+            <ul class="reattest-rules-list">
+              <li>
+                Sexual images or behaviour — not appropriate in the
+                Requests &amp; Offers Holochain ecosystem.
+              </li>
+              <li>Unwelcome sexual attention.</li>
+              <li>
+                Pattern of inappropriate social contact, such as requesting or
+                assuming inappropriate levels of intimacy with others.
+              </li>
+              <li>Continued one-on-one communication after requests to cease.</li>
+            </ul>
+
+            <h4 class="ds-small reattest-rules-group-heading">Privacy</h4>
+            <ul class="reattest-rules-list">
+              <li>
+                Deliberate "outing" of any aspect of a person's identity
+                without their consent except as necessary to protect
+                vulnerable people from intentional abuse.
+              </li>
+              <li>
+                Surveilling another participant's activity — for example
+                screenshotting their messages or listings, or compiling logs
+                of their behaviour for harassment purposes.
+              </li>
+              <li>Publication of private communication.</li>
+            </ul>
+          </div>
+
+          {#if !approveHasScrolled}
+            <p class="ds-small reattest-scroll-hint">
+              Please read to the end before agreeing.
+            </p>
+          {/if}
+
+          <label class="reattest-checkbox-row">
+            <input
+              type="checkbox"
+              class="ds-checkbox"
+              bind:checked={approveAccepted}
+              disabled={!approveHasScrolled || joining.isLoading}
+            />
+            <span
+              class="reattest-checkbox-label"
+              class:reattest-checkbox-label--disabled={!approveHasScrolled}
+            >
+              I have read the community agreements above and I commit to
+              participate accordingly.
+            </span>
+          </label>
+        </div>
+
+        {#if joining.error}
+          <p class="ds-small join-error">{joining.error}</p>
+        {/if}
+
+        <div class="join-actions">
+          <button
+            type="button"
+            class="btn-ds btn-ds--primary"
+            disabled={!approveHasScrolled || !approveAccepted || joining.isLoading}
+            onclick={handleSignAndJoin}
+          >
+            {#if joining.isLoading}
+              ⏳ Signing and binding…
+            {:else}
+              ✍️ Sign and join Requests &amp; Offers
+            {/if}
+          </button>
+        </div>
+
+        <p class="ds-small approve-closing">
+          Mutual aid works when people show up for each other — thanks for joining.
+        </p>
+      </div>
+    </div>
+
   <!-- ── JOIN FORM ── application form (Sig 1 payload) ── -->
   {:else if route === 'join-form'}
     <div class="join-form-page">
@@ -1080,6 +1325,7 @@
       </div>
     </div>
 
+  <!-- ── RULES RE-ATTESTATION ── stale rules; hard-enforcement gate to home ── -->
   {:else if route === 'rules-reattestation'}
     <div class="centered-screen">
       <div class="join-card join-card--wide">
@@ -1200,12 +1446,15 @@
             Participants are responsible for knowing and abiding by these rules.
           </p>
 
-          <h3 class="ds-h4 reattest-rules-subheading">Harassment includes</h3>
+          <p class="ds-p">Harassment includes:</p>
+
+          <h4 class="ds-small reattest-rules-group-heading">Communication and language</h4>
           <ul class="reattest-rules-list">
             <li>
-              Offensive comments related to gender, gender identity and expression,
-              sexual orientation, disability, mental illness, neuro(a)typicality,
-              physical appearance, body size, age, race, class, or religion.
+              Offensive comments related to gender, gender identity and
+              expression, sexual orientation, disability, mental illness,
+              neuro(a)typicality, physical appearance, body size, age, race,
+              class, or religion.
             </li>
             <li>
               Unwelcome comments regarding a person's lifestyle choices and
@@ -1213,39 +1462,47 @@
               drugs, and employment.
             </li>
             <li>Deliberate misgendering or use of 'dead' or rejected names.</li>
-            <li>
-              Gratuitous or off-topic sexual images or behaviour in spaces where
-              they're not appropriate.
-            </li>
-            <li>
-              Physical contact and simulated physical contact (e.g. textual
-              descriptions like "hug" or "backrub") without consent or after a
-              request to stop.
-            </li>
+          </ul>
+
+          <h4 class="ds-small reattest-rules-group-heading">Threats and disruption</h4>
+          <ul class="reattest-rules-list">
             <li>Threats of violence.</li>
             <li>
-              Incitement of violence towards any individual, including encouraging
-              a person to commit suicide or to engage in self-harm.
+              Incitement of violence towards any individual, including
+              encouraging a person to commit suicide or to engage in
+              self-harm.
             </li>
-            <li>Deliberate intimidation.</li>
             <li>Stalking or following.</li>
-            <li>
-              Harassing photography or recording, including logging online activity
-              for harassment purposes.
-            </li>
             <li>Sustained disruption of discussion.</li>
+          </ul>
+
+          <h4 class="ds-small reattest-rules-group-heading">Sexual content and unwelcome contact</h4>
+          <ul class="reattest-rules-list">
+            <li>
+              Sexual images or behaviour — not appropriate in the
+              Requests &amp; Offers Holochain ecosystem.
+            </li>
             <li>Unwelcome sexual attention.</li>
             <li>
               Pattern of inappropriate social contact, such as requesting or
               assuming inappropriate levels of intimacy with others.
             </li>
             <li>Continued one-on-one communication after requests to cease.</li>
+          </ul>
+
+          <h4 class="ds-small reattest-rules-group-heading">Privacy</h4>
+          <ul class="reattest-rules-list">
             <li>
-              Deliberate "outing" of any aspect of a person's identity without
-              their consent except as necessary to protect vulnerable people from
-              intentional abuse.
+              Deliberate "outing" of any aspect of a person's identity
+              without their consent except as necessary to protect
+              vulnerable people from intentional abuse.
             </li>
-            <li>Publication of non-harassing private communication.</li>
+            <li>
+              Surveilling another participant's activity — for example
+              screenshotting their messages or listings, or compiling logs
+              of their behaviour for harassment purposes.
+            </li>
+            <li>Publication of private communication.</li>
           </ul>
         </div>
 
@@ -3012,19 +3269,40 @@
 
   .reattest-rules-container {
     height: 360px;
-    overflow-y: auto;
+    overflow-y: scroll; /* force scrollbar to always be present */
     border: 1px solid rgb(var(--border-1));
     border-radius: 10px;
     padding: 18px 22px;
     background: rgb(var(--bg-1));
     transition: box-shadow 200ms ease;
+    /* Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--fg-3)) rgb(var(--bg-muted));
+  }
+  /* WebKit / Chromium / Brave */
+  .reattest-rules-container::-webkit-scrollbar {
+    width: 10px;
+  }
+  .reattest-rules-container::-webkit-scrollbar-track {
+    background: rgb(var(--bg-muted));
+    border-radius: 0 10px 10px 0;
+  }
+  .reattest-rules-container::-webkit-scrollbar-thumb {
+    background: rgb(var(--fg-3));
+    border-radius: 5px;
+    border: 2px solid rgb(var(--bg-muted));
+  }
+  .reattest-rules-container::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--fg-2));
   }
   .reattest-rules-container:focus {
     outline: 2px solid rgb(var(--color-primary-50) / 0.5);
     outline-offset: 2px;
   }
   .reattest-rules-container--unread {
-    box-shadow: inset 0 -32px 24px -24px rgb(var(--bg-muted));
+    /* Stronger fade — uses a soft secondary-tinted overlay so the gradient
+       is visible against the rules container's white background. */
+    box-shadow: inset 0 -60px 30px -32px rgb(var(--color-secondary-50) / 0.18);
   }
   .reattest-rules-heading {
     margin: 0 0 12px 0;
@@ -3047,10 +3325,18 @@
   }
 
   .reattest-scroll-hint {
-    margin: 12px 0 0 0;
-    color: rgb(var(--color-warning-50));
+    margin: 12px auto 0 auto;
+    padding: 8px 16px;
+    color: rgb(var(--color-warning-800));
+    background: rgb(var(--color-warning-100));
+    border: 1px solid rgb(var(--color-warning-400));
+    border-radius: 999px;
+    display: block;
+    width: max-content;
+    max-width: 100%;
     text-align: center;
     font-style: italic;
+    font-weight: 600;
   }
 
   .reattest-checkbox-row {
@@ -3075,5 +3361,111 @@
   }
   .reattest-checkbox-label--disabled {
     color: rgb(var(--fg-3));
+  }
+
+  /* ==========================================================================
+     Wave 3c — join-approved (three-sig binding ceremony)
+     Reuses .reattest-rules-container, .reattest-scroll-hint,
+     .reattest-checkbox-row, .reattest-checkbox-label from Wave 3b.
+     ========================================================================== */
+  .approve-heading {
+    margin: 0 0 4px 0;
+  }
+  .approve-subhead-emoji {
+    text-align: center;
+    font-size: 38px;
+    line-height: 1;
+    margin: 0 0 8px 0;
+  }
+  .approve-subhead {
+    margin: 0 0 22px 0;
+    text-align: center;
+    font: 700 22px/1.3 var(--font-base);
+    color: rgb(var(--color-primary-700));
+  }
+
+  .approve-welcome-list {
+    counter-reset: approve-welcome;
+    list-style: none;
+    margin: 0 0 18px 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .approve-welcome-list li {
+    counter-increment: approve-welcome;
+    position: relative;
+    padding: 12px 14px 12px 48px;
+    border-radius: 10px;
+    background: rgb(var(--color-secondary-50) / 0.10);
+    border-left: 3px solid rgb(var(--color-secondary-50));
+    color: rgb(var(--fg-1));
+    line-height: 1.5;
+    font-size: 14px;
+  }
+  .approve-welcome-list li::before {
+    content: counter(approve-welcome);
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgb(var(--color-secondary-50));
+    color: rgb(var(--bg-1));
+    font: 700 14px/28px var(--font-base);
+    text-align: center;
+  }
+  .approve-welcome-lead {
+    color: rgb(var(--fg-1));
+    font-weight: 600;
+    margin-right: 4px;
+  }
+
+  .approve-agreements-section {
+    border-top: 1px solid rgb(var(--border-1));
+    padding-top: 18px;
+    margin-top: 6px;
+  }
+  .approve-agreements-intro {
+    margin: 0 0 14px 0;
+    color: rgb(var(--fg-2));
+  }
+
+  .approve-closing {
+    margin: 14px 0 0 0;
+    color: rgb(var(--fg-3));
+    text-align: center;
+    font-style: italic;
+  }
+
+  /* Bold variant for the agreements-intro paragraph. */
+  .approve-agreements-intro--bold {
+    font-weight: 600;
+    color: rgb(var(--fg-1));
+  }
+
+  /* Group sub-headings inside the rules scroll container. */
+  .reattest-rules-group-heading {
+    margin: 16px 0 6px 0;
+    font: 700 italic 15px/1.3 var(--font-base);
+    color: rgb(var(--fg-1));
+    text-align: left;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+  .reattest-rules-group-heading:first-of-type {
+    margin-top: 8px;
+  }
+
+  /* Tighten the rules list spacing now that there are sub-grouped lists. */
+  .reattest-rules-container ul.reattest-rules-list {
+    margin: 4px 0 0 0;
+    padding-left: 22px;
+  }
+  .reattest-rules-container ul.reattest-rules-list li {
+    margin: 3px 0;
+    text-align: left;
   }
 </style>
