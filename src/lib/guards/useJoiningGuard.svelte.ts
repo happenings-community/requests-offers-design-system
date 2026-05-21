@@ -402,6 +402,12 @@ export function useJoiningGuard(options: UseJoiningGuardOptions = {}): UseJoinin
   ): void {
     // Demo escape hatch for the FAB control. Sets status and optionally seeds
     // member-status mock data for the member-suspended screen.
+    // Setting to "unauthenticated" also clears application/binding state so
+    // the demo can be re-run cleanly without F5'ing the browser.
+    if (newStatus === "unauthenticated") {
+      reset();
+      return;
+    }
     status = newStatus;
     error = null;
     if (newStatus === "member-suspended") {

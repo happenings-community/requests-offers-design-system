@@ -190,6 +190,44 @@
   function addLink(links: string[], inp: string): [string[], string] {
     return inp.trim() ? [[...links, inp.trim()], ''] : [links, inp];
   }
+
+  // ── Joining flow composable (Layer 0/1) ────────────────────────────────────
+  // Wave 1 of Phase 4d. Drives routing through the joining lifecycle.
+  // See src/lib/guards/useJoiningGuard.svelte.ts for the three-sig protocol.
+  import { useJoiningGuard, type JoiningStatus } from '$lib/guards/useJoiningGuard.svelte';
+
+  const joining = useJoiningGuard();
+
+  // Auto-route when the composable's nextRoute changes, but ONLY while the
+  // user is still in the joining lifecycle. Once status === 'authenticated',
+  // we let the user navigate freely from home.
+  $effect(() => {
+    if (joining.status !== 'authenticated' && joining.nextRoute !== route) {
+      navigate(joining.nextRoute);
+    }
+  });
+
+  // Join-form state (mirrors p* naming from existing user-create form)
+  let jGivenName  = $state('');
+  let jFamilyName = $state('');
+  let jIsMononym  = $derived(jFamilyName.trim() === '' || jFamilyName.trim() === '.');
+  let jNickname   = $state('');
+  let jEmail      = $state('');
+  let jUserType   = $state<'advocate' | 'creator'>('advocate');
+  let jReason     = $state('');
+
+  // Password-gate state
+  let pgEmail     = $state('');
+  let pgPassword  = $state('');
+
+  // Demo-control panel state — always-visible bottom-right
+  // Lets the show-and-tell jump between the eleven JoiningStatus values
+  // without walking the happy path each time.
+  let demoStatus = $state<JoiningStatus>('unauthenticated');
+  function setDemoStatus(s: JoiningStatus) {
+    demoStatus = s;
+    joining.__setStatusForDemo(s);
+  }
 </script>
 
 <!-- ══════════════════════════════════════════════════════════
@@ -446,8 +484,145 @@
 {:else}
 <ds-shell route={route} app-name="Requests & Offers" logo-src="/assets/hAppeningsCIClogo.png">
 
-  <!-- ── HOME ── -->
-  {#if route === 'home'}
+  <!-- ══════════════════════════════════════════════════════════
+       SHARED SNIPPETS
+       ══════════════════════════════════════════════════════════ -->
+
+  {#snippet scoreboard()}
+    <!--
+      Scoreboard surface for unauthenticated (join-welcome) and post-application
+      (join-pending) audiences. NEW CONTENT requested by Anita; not part of
+      Sacha's existing design-system primitives. Final content (which listings
+      to surface, count semantics, tone) to be defined by Anita; current
+      numbers are realistic mock placeholders for the Alpha 0.5.1 community.
+    -->
+    <div class="scoreboard">
+      <p class="ds-small scoreboard-summary">
+        <strong>12</strong> listings · <strong>24</strong> members · <strong>8</strong> exchanges
+      </p>
+      <div class="scoreboard-cols">
+        <div class="scoreboard-col scoreboard-col--requests">
+          <h4 class="ds-h4 scoreboard-col-title">Latest Requests</h4>
+          {#each REQUESTS.slice(0, 2) as r (r.id)}
+            <button class="scoreboard-item" onclick={() => navigate('request-detail', r.id)}>
+              <span class="scoreboard-item-icon">📝</span>
+              <div class="scoreboard-item-body">
+                <p class="scoreboard-item-title">{r.title}</p>
+                <p class="ds-small scoreboard-item-meta">by {r.creator.name}</p>
+              </div>
+            </button>
+          {/each}
+        </div>
+        <div class="scoreboard-col scoreboard-col--offers">
+          <h4 class="ds-h4 scoreboard-col-title">Recent Offers</h4>
+          {#each OFFERS.slice(0, 2) as o (o.id)}
+            <button class="scoreboard-item" onclick={() => navigate('offer-detail', o.id)}>
+              <span class="scoreboard-item-icon">💡</span>
+              <div class="scoreboard-item-body">
+                <p class="scoreboard-item-title">{o.title}</p>
+                <p class="ds-small scoreboard-item-meta">by {o.creator.name}</p>
+              </div>
+            </button>
+          {/each}
+        </div>
+      </div>
+    </div>
+  {/snippet}
+
+  <!-- ══════════════════════════════════════════════════════════
+       JOINING FLOW + MEMBRANE GATES
+       Wave 1: access-issue, join-welcome, join-pending, join-rejected
+       ══════════════════════════════════════════════════════════ -->
+
+  <!-- ── ACCESS ISSUE ── graceful degradation for JoiningStatus="unknown" ── -->
+  {#if route === 'access-issue'}
+    <div class="centered-screen">
+      <div class="join-card">
+        <h1 class="ds-h2">Something is not quite right</h1>
+        <p class="ds-p">We could not determine your access status. This is usually a transient issue — please try again.</p>
+        {#if joining.error}
+          <p class="ds-small join-error">{joining.error}</p>
+        {/if}
+        <div class="join-actions">
+          <button class="btn-ds btn-ds--primary" onclick={() => joining.retry()}>↺ Try again</button>
+        </div>
+      </div>
+    </div>
+
+  <!-- ── JOIN WELCOME ── public, unauthenticated landing ── -->
+  {:else if route === 'join-welcome'}
+    <div class="join-page">
+      <div class="join-hero">
+        <h1 class="ds-h1">Welcome to Requests &amp; Offers</h1>
+        <h2 class="ds-h2 join-subhead">Holochain Ecosystem</h2>
+        <p class="ds-p join-tagline">Connect and exchange with other Advocates and Creators in <em>our</em> community!</p>
+        <p class="ds-p join-body">Requests &amp; Offers is a mutual-aid hApp for the Holochain community. Browse the public listings — see what people are offering, what they are asking for — and join when you are ready to participate.</p>
+        <div class="join-actions">
+          <button class="btn-ds btn-ds--primary" onclick={() => navigate('join-form')}>✨ Join the community</button>
+        </div>
+      </div>
+
+      {@render scoreboard()}
+
+      <p class="ds-small join-footer">
+        Joining is a welcomed entry, not signup. You will hear back from us within 48 hours.
+        If you would like to connect with us please email:
+        <a href="mailto:info@happenings.community">info@happenings.community</a>
+      </p>
+    </div>
+
+  <!-- ── JOIN PENDING ── post-application, awaiting admin review ── -->
+  {:else if route === 'join-pending'}
+    <div class="join-page">
+      <div class="join-hero">
+        <h1 class="ds-h2">Application sent</h1>
+        <p class="ds-p">
+          Your application will be reviewed in the next 48 hours. Keep an eye on your email
+          inbox at <strong>{joining.application?.data.email ?? 'the address you provided'}</strong>
+          — we will let you know there when you can join the Requests &amp; Offers — Holochain Ecosystem network.
+        </p>
+        {#if joining.application}
+          <p class="ds-small join-meta">
+            Submitted {new Date(joining.application.submitted_at).toLocaleString()}
+          </p>
+        {/if}
+      </div>
+
+      {@render scoreboard()}
+
+      <p class="ds-small join-footer">
+        You can safely close this page. Your application is saved — no need to reapply.
+        Joining is a welcomed entry, not signup. You will hear back from us within 48 hours.
+        If you would like to connect with us please email:
+        <a href="mailto:info@happenings.community">info@happenings.community</a>
+      </p>
+    </div>
+
+  <!-- ── JOIN REJECTED ── application not approved ── -->
+  {:else if route === 'join-rejected'}
+    <div class="centered-screen">
+      <div class="join-card">
+        <h1 class="ds-h2">We were not able to welcome you at this time</h1>
+        <p class="ds-p">
+          We are currently running a closed Alpha test, and not everyone who applies can be
+          included in this round. This is a constraint of where we are in the project.
+        </p>
+        <p class="ds-p">
+          Keep an eye on our "What's hAppening?" Newsletter where we will announce the next
+          round of testing. Thanks for applying.
+        </p>
+        <p class="ds-p join-body">
+          If this feels wrong, or if you would like to be considered for the next round,
+          reach out to us at <a href="mailto:info@happenings.community">info@happenings.community</a>
+          and one of the team will be in touch.
+        </p>
+        <div class="join-actions">
+          <a class="btn-ds btn-ds--primary" href="mailto:info@happenings.community">✉️ Email info@happenings.community</a>
+        </div>
+      </div>
+    </div>
+
+  {:else if route === 'home'}
     <div class="page">
       {#if !hasProfile}
         <!-- New user -->
@@ -1286,6 +1461,33 @@
   {/if}
 
 </ds-shell>
+
+<!-- ══════════════════════════════════════════════════════════
+     DEMO CONTROLS — fixed bottom-right, always visible
+     Lets the show-and-tell jump between the eleven JoiningStatus
+     values without walking the happy path each time.
+     ══════════════════════════════════════════════════════════ -->
+<div class="demo-controls">
+  <span class="demo-controls-label">🎛️ Demo</span>
+  <select
+    class="demo-controls-select"
+    bind:value={demoStatus}
+    onchange={(e) => setDemoStatus((e.target as HTMLSelectElement).value as JoiningStatus)}
+  >
+    <option value="unauthenticated">unauthenticated</option>
+    <option value="lobby-pending">lobby-pending</option>
+    <option value="lobby-rejected">lobby-rejected</option>
+    <option value="lobby-approved">lobby-approved</option>
+    <option value="binding-in-progress">binding-in-progress</option>
+    <option value="binding-needs-password">binding-needs-password</option>
+    <option value="instance-locked">instance-locked</option>
+    <option value="member-suspended">member-suspended</option>
+    <option value="rules-stale">rules-stale</option>
+    <option value="authenticated">authenticated</option>
+    <option value="unknown">unknown</option>
+  </select>
+  <button class="demo-controls-reset" onclick={() => setDemoStatus('unauthenticated')} title="Reset to unauthenticated">↺</button>
+</div>
 {/if}
 
 <!-- ── CONTACT MODAL ── -->
@@ -1641,4 +1843,185 @@
     padding: 14px 16px; background: rgb(var(--color-primary-50)); border: 1px solid rgb(var(--color-primary-100)); border-radius: 12px;
   }
   .btn-ghost--sm { padding: 6px 10px; font-size: 12px; flex-shrink: 0; }
+
+  /* ════════════════════════════════════════════════════════════════
+     WAVE 1.1 — Joining flow styles (Phase 4d)
+     Reuses Sacha\'s existing card grammar; chromatic identity via
+     --color-secondary (requests) + --color-warning (offers) tokens.
+     ════════════════════════════════════════════════════════════════ */
+
+  /* Page wrapper for full-bleed joining surfaces (welcome / pending). */
+  .join-page {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 20px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* Hero block — twin-headlines + tightened body. Centered. */
+  .join-hero {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 0 0;
+  }
+  .join-hero .ds-h1 { margin: 0; }
+  .join-hero .ds-h2 { margin: 0; }
+  .join-hero .ds-p { max-width: 600px; margin: 0; }
+  .join-subhead { color: rgb(var(--fg-1)); margin-top: -4px; }
+  .join-tagline { color: rgb(var(--fg-2)); margin-top: 8px; }
+  .join-tagline em { font-style: italic; color: rgb(var(--color-primary-600)); }
+  .join-body { color: rgb(var(--fg-2)); }
+  .join-meta { color: rgb(var(--fg-3)); margin-top: 4px; }
+
+  /* Card-style centered screen for rejected / access-issue. */
+  .join-card {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 32px;
+    background: #fff;
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 16px;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+  .join-card .ds-p { text-align: left; }
+
+  .join-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+
+  .join-error {
+    color: rgb(var(--color-error-600));
+    background: rgb(var(--color-error-50));
+    padding: 10px 14px;
+    border-radius: 8px;
+  }
+
+  .join-footer {
+    text-align: center;
+    color: rgb(var(--fg-3));
+    max-width: 640px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+  .join-footer a { color: rgb(var(--color-primary-600)); text-decoration: none; }
+  .join-footer a:hover { text-decoration: underline; }
+
+  /* Scoreboard — community pulse for unauthenticated + post-application audiences.
+     NEW SURFACE from Anita\'s brief. Built using Sacha\'s existing card vocabulary
+     (white bg, --border-1, 16px radius, shadow-md) + chromatic tinting per column. */
+  .scoreboard {
+    background: #fff;
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 16px;
+    box-shadow: var(--shadow-md);
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .scoreboard-summary {
+    text-align: center;
+    color: rgb(var(--fg-2));
+    margin: 0;
+  }
+  .scoreboard-summary strong { color: rgb(var(--fg-1)); }
+  .scoreboard-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .scoreboard-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid rgb(var(--border-1));
+  }
+  .scoreboard-col--requests { background: rgb(var(--color-secondary-50)); }
+  .scoreboard-col--offers   { background: rgb(var(--color-warning-50)); }
+  .scoreboard-col-title { margin: 0 0 2px; color: rgb(var(--fg-1)); }
+
+  /* Scoreboard listing item — compact horizontal row, clickable. */
+  .scoreboard-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: left;
+    transition: box-shadow 150ms, border-color 150ms;
+    font: inherit;
+    color: inherit;
+  }
+  .scoreboard-item:hover { box-shadow: var(--shadow-md); border-color: rgb(var(--color-primary-300)); }
+  .scoreboard-item-icon { font-size: 18px; flex-shrink: 0; line-height: 1.2; }
+  .scoreboard-item-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+  .scoreboard-item-title {
+    font: 500 14px/20px var(--font-base);
+    color: rgb(var(--fg-1));
+    margin: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .scoreboard-item-meta { margin: 0; color: rgb(var(--fg-3)); }
+
+  /* Responsive: stack columns on narrow viewports. */
+  @media (max-width: 640px) {
+    .scoreboard-cols { grid-template-columns: 1fr; }
+    .join-page { padding: 16px 16px 24px; }
+  }
+
+  /* Demo controls — fixed bottom-right, always visible. */
+  .demo-controls {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px 8px 12px;
+    background: rgb(var(--bg-1));
+    border: 1px solid rgb(var(--border-1));
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+    font: 500 12px/1 var(--font-base);
+  }
+  .demo-controls-label { color: rgb(var(--fg-3)); }
+  .demo-controls-select {
+    font: 500 12px/1 var(--font-base);
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid rgb(var(--border-1));
+    background: rgb(var(--bg-1));
+    color: rgb(var(--fg-1));
+    cursor: pointer;
+  }
+  .demo-controls-reset {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 1px solid rgb(var(--border-1));
+    background: rgb(var(--bg-1));
+    color: rgb(var(--fg-2));
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .demo-controls-reset:hover { background: rgb(var(--bg-muted)); color: rgb(var(--fg-1)); }
 </style>
