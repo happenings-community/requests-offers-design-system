@@ -31,7 +31,7 @@
 
 <svelte:window onkeydown={handleKey} />
 
-<div class="flex h-full min-h-screen flex-col bg-surface-50 text-surface-900">
+<div class="relative flex h-full min-h-screen flex-col bg-surface-50 text-surface-900">
   {#if !isAdmin}
     <Navbar {appName} {logoSrc} {showAdmin} />
   {/if}

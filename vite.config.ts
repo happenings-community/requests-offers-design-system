@@ -6,5 +6,8 @@ export default defineConfig({
   ssr: {
     noExternal: ['@skeletonlabs/skeleton']
   },
-  base: './'
+  base: './',
+  server: {
+    watch: null
+  }
 });
