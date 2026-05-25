@@ -6,6 +6,7 @@
 
   let tab = $state<'active' | 'archived'>('active');
   let filter = $state<'all' | 'my' | 'org'>('all');
+  let search = $state('');
 
   let filtered = $derived(
     OFFERS.filter((o) => {
@@ -13,6 +14,7 @@
       if (tab === 'archived' && o.status !== 'archived') return false;
       if (filter === 'my' && o.creator.id !== ME.id) return false;
       if (filter === 'org' && !o.org) return false;
+      if (search.trim() && !o.title.toLowerCase().includes(search.toLowerCase()) && !o.description.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     })
   );
@@ -31,6 +33,16 @@
     {#each [{ k: 'all', l: 'All' }, { k: 'my', l: 'My Offers' }, { k: 'org', l: 'My Organization' }] as f}
       <button class="ro-filter-chip {filter === f.k ? 'ro-filter-chip--warn' : ''}" onclick={() => (filter = f.k as typeof filter)}>{f.l}</button>
     {/each}
+  </div>
+
+  <!-- Search matching R&O's filter controls -->
+  <div class="mb-4">
+    <input
+      type="text"
+      placeholder="Search by title or description..."
+      bind:value={search}
+      class="input w-full max-w-sm"
+    />
   </div>
 
   {#if filtered.length}

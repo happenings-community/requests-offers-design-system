@@ -49,14 +49,14 @@ export type Medium = {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 export const SERVICE_TYPES = [
-  { id: 'st1', name: 'Mentoring', technical: false },
-  { id: 'st2', name: 'Software Dev', technical: true },
-  { id: 'st3', name: 'Design', technical: false },
-  { id: 'st4', name: 'Translation', technical: false },
-  { id: 'st5', name: 'Legal Advice', technical: false },
-  { id: 'st6', name: 'Permaculture', technical: false },
-  { id: 'st7', name: 'Music / Audio', technical: false },
-  { id: 'st8', name: 'Data Analysis', technical: true }
+  { id: 'st1', name: 'Mentoring', technical: false, description: 'Guidance, coaching, and knowledge-sharing to help others develop skills and navigate challenges.' },
+  { id: 'st2', name: 'Software Dev', technical: true, description: 'Programming, software architecture, code review, debugging, and technical consulting.' },
+  { id: 'st3', name: 'Design', technical: false, description: 'UI/UX, graphic design, brand identity, wireframing, and visual communication.' },
+  { id: 'st4', name: 'Translation', technical: false, description: 'Translation and interpretation between languages, including technical and literary content.' },
+  { id: 'st5', name: 'Legal Advice', technical: false, description: 'General legal guidance on contracts, intellectual property, and community governance.' },
+  { id: 'st6', name: 'Permaculture', technical: false, description: 'Sustainable agriculture, garden design, ecological systems planning and implementation.' },
+  { id: 'st7', name: 'Music / Audio', technical: false, description: 'Music lessons, audio production, sound engineering, and music therapy.' },
+  { id: 'st8', name: 'Data Analysis', technical: true, description: 'Data processing, statistical analysis, visualization, and insights generation.' }
 ];
 
 export const MEDIUMS: Medium[] = [
@@ -110,7 +110,8 @@ export const OFFERS: Item[] = [
   { id: 'of1', title: 'UI/UX design consultation — 2 sessions', description: 'I can help with wireframes, user flows, and visual design reviews. I specialise in accessibility-first design. Two 90-minute sessions included.', serviceTypes: ['Design'], mediums: ['Skill Exchange', 'Time Credits'], interaction: 'Virtual', timePreference: 'Afternoon', timeZone: 'Europe/Madrid', status: 'active', creator: USERS[1], links: ['https://marcodelgado.design'], org: null },
   { id: 'of2', title: 'Holochain zome development guidance', description: 'I can pair-program with you on Rust-based Holochain zomes, review your architecture, help set up Sweettest tests, and explain HDK/HDI patterns.', serviceTypes: ['Software Dev', 'Mentoring'], mediums: ['Time Credits'], interaction: 'Virtual', timePreference: 'Morning', timeZone: 'Asia/Tokyo', status: 'active', creator: USERS[2], links: [], org: null },
   { id: 'of3', title: 'French lessons for beginners/intermediate', description: 'Native French speaker offering structured lessons or conversational practice. Tailored to your level and goals. Skype or Jitsi.', serviceTypes: ['Translation', 'Mentoring'], mediums: ['Skill Exchange'], interaction: 'Virtual', timePreference: 'Evening', timeZone: 'Europe/Paris', status: 'active', creator: USERS[3], links: [], org: ORGS[0] },
-  { id: 'of4', title: 'Open-source TypeScript code review', description: 'I will review your TypeScript project (up to 2000 lines), provide written feedback on architecture, type safety, and best practices.', serviceTypes: ['Software Dev'], mediums: ['Time Credits', 'EUR'], interaction: 'Virtual', timePreference: 'No Preference', timeZone: 'Asia/Tokyo', status: 'archived', creator: USERS[2], links: [], org: null }
+  { id: 'of4', title: 'Open-source TypeScript code review', description: 'I will review your TypeScript project (up to 2000 lines), provide written feedback on architecture, type safety, and best practices.', serviceTypes: ['Software Dev'], mediums: ['Time Credits', 'EUR'], interaction: 'Virtual', timePreference: 'No Preference', timeZone: 'Asia/Tokyo', status: 'archived', creator: USERS[2], links: [], org: null },
+  { id: 'of5', title: 'Holochain hApp architecture review', description: 'I can review your Holochain application architecture, entry types, link types, and zome structure. Will provide written feedback and suggest improvements for scalability and maintainability.', serviceTypes: ['Software Dev', 'Mentoring'], mediums: ['Skill Exchange', 'Time Credits'], interaction: 'Virtual', timePreference: 'Evening', timeZone: 'Europe/Paris', status: 'active', creator: USERS[4], links: ['https://github.com/happenings-community'], org: ORGS[0] }
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
