@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@tailwind variants;
+
+@layer base {
+  :root {
+    --font-base: var(--theme-font-family-base, system-ui, sans-serif);
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --fg-1: rgb(var(--color-surface-900));
+    --fg-2: rgb(var(--color-surface-600));
+    --fg-3: rgb(var(--color-surface-400));
+
+    --bg-app: rgb(var(--color-surface-50));
+    --bg-muted: rgb(var(--color-surface-100));
+
+    --border-1: rgb(var(--color-surface-200));
+    --border-2: rgb(var(--color-surface-300));
+
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+    --radius-pill: 9999px;
+  }
+}
+
+@layer components {
+}
+
+@layer utilities {
+}

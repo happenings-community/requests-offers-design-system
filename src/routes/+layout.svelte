@@ -1,5 +1,9 @@
 <script lang="ts">
+  import '../app.postcss';
   import { page } from '$app/state';
+  import type { Snippet } from 'svelte';
+
+  let { children }: { children: Snippet } = $props();
 
   let isApp = $derived(page.url.pathname.startsWith('/ui-kit/app'));
   let current = $derived(page.url.pathname);
@@ -12,15 +16,19 @@
     { href: '/playbook/navigation', label: 'Navigation',  icon: '🧭' },
   ];
   const scenarios = [
-    { href: '/ui-kit/browse-active',         label: 'Browse Active',   icon: '🏠' },
-    { href: '/ui-kit/create-request',        label: 'Create Request',  icon: '📝' },
-    { href: '/ui-kit/admin-dashboard',       label: 'Admin',           icon: '⚙️' },
-    { href: '/ui-kit/connecting-onboarding', label: 'Connecting',      icon: '🔗' },
+    { href: '/ui-kit/app/home',           label: 'Dashboard',        icon: '🏠' },
+    { href: '/ui-kit/app/requests',       label: 'Browse Requests',  icon: '📝' },
+    { href: '/ui-kit/app/offers',         label: 'Browse Offers',    icon: '💡' },
+    { href: '/ui-kit/app/members',        label: 'Members',          icon: '👥' },
+    { href: '/ui-kit/app/organizations',  label: 'Organizations',    icon: '🏢' },
+    { href: '/ui-kit/app/my-requests',    label: 'My Requests',      icon: '📋' },
+    { href: '/ui-kit/app/create-request', label: 'Create Request',   icon: '✏️' },
+    { href: '/ui-kit/app/admin',          label: 'Admin',            icon: '⚙️' },
   ];
 </script>
 
 {#if isApp}
-  <slot />
+  {@render children()}
 {:else}
   <div class="ds-chrome">
     <aside class="ds-sidebar">
@@ -66,14 +74,14 @@
     </aside>
 
     <main class="ds-main">
-      <slot />
+      {@render children()}
     </main>
   </div>
 {/if}
 
 <style>
   :global(*, *::before, *::after) { box-sizing: border-box; }
-  :global(body) { margin: 0; font-family: var(--font-base); background: rgb(var(--bg-muted)); color: rgb(var(--fg-1)); }
+  :global(body) { margin: 0; font-family: var(--font-base); background: rgb(var(--color-surface-50)); color: rgb(var(--color-surface-900)); }
 
   .ds-chrome { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
 
@@ -92,14 +100,14 @@
   }
   .ds-logo:hover { background: rgba(255,255,255,.06); }
   .ds-logo img { width: 36px; height: 36px; flex-shrink: 0; }
-  .ds-logo-title { font: 700 14px/18px var(--font-base); color: #fff; }
-  .ds-logo-sub { font: 400 11px/14px var(--font-base); color: rgba(255,255,255,.5); }
+  .ds-logo-title { font: 700 14px/18px var(--theme-font-family-base); color: #fff; }
+  .ds-logo-sub { font: 400 11px/14px var(--theme-font-family-base); color: rgba(255,255,255,.5); }
 
   .app-mode-btn {
     display: flex; align-items: center; gap: 8px; justify-content: center;
     padding: 9px 12px; border-radius: 10px; margin-bottom: 20px;
     background: rgb(var(--color-secondary-500)); color: #111;
-    font: 700 13px/18px var(--font-base); text-decoration: none;
+    font: 700 13px/18px var(--theme-font-family-base); text-decoration: none;
     transition: background 100ms, transform 100ms;
   }
   .app-mode-btn:hover { background: rgb(var(--color-secondary-400)); transform: translateY(-1px); }
@@ -108,7 +116,7 @@
   .ds-nav-section { display: flex; flex-direction: column; gap: 2px; }
 
   .ds-nav-group-label {
-    font: 600 10px/14px var(--font-base); letter-spacing: .1em; text-transform: uppercase;
+    font: 600 10px/14px var(--theme-font-family-base); letter-spacing: .1em; text-transform: uppercase;
     color: rgba(255,255,255,.4); padding: 6px 8px 4px; display: block; text-decoration: none;
     transition: color 100ms;
   }
@@ -118,7 +126,7 @@
   .ds-nav-item {
     display: flex; align-items: center; gap: 8px;
     padding: 6px 10px; border-radius: 7px;
-    font: 500 13px/18px var(--font-base); color: rgba(255,255,255,.65);
+    font: 500 13px/18px var(--theme-font-family-base); color: rgba(255,255,255,.65);
     text-decoration: none; transition: background 100ms, color 100ms;
   }
   .ds-nav-item:hover { background: rgba(255,255,255,.08); color: rgba(255,255,255,.9); }
@@ -126,7 +134,7 @@
   .ds-nav-ic { width: 18px; text-align: center; font-size: 13px; }
 
   .ds-sidebar-footer { margin-top: auto; padding-top: 12px; }
-  .ds-sidebar-version { font: 400 11px/14px var(--font-mono); color: rgba(255,255,255,.25); padding: 0 8px; }
+  .ds-sidebar-version { font: 400 11px/14px monospace; color: rgba(255,255,255,.25); padding: 0 8px; }
 
-  .ds-main { min-height: 100vh; background: rgb(var(--bg-muted)); }
+  .ds-main { min-height: 100vh; background: #f0f1f5; }
 </style>

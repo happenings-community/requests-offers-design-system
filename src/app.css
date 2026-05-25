@@ -1,7 +1,0 @@
-*, *::before, *::after { box-sizing: border-box; }
-body {
-  margin: 0;
-  font-family: var(--font-base);
-  background: rgb(var(--bg-app));
-  color: rgb(var(--fg-1));
-}
