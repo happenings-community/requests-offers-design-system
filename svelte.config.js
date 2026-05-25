@@ -11,6 +11,7 @@ export default {
     })
   },
   vitePlugin: {
-    emitCss: false
+    emitCss: false,
+    inspector: true
   }
 };

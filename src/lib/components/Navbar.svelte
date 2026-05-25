@@ -17,15 +17,48 @@
     showAdmin = false
   }: Props = $props();
 
-  const dropdownGroups = ['My Activity', 'Community', 'Resources'];
-
   let path = $derived(page.url.pathname);
   let onRequests = $derived(path.startsWith('/ui-kit/app/requests'));
   let onOffers = $derived(path.startsWith('/ui-kit/app/offers'));
   let onAdmin = $derived(path.startsWith('/ui-kit/app/admin'));
+
+  let openMenu = $state<string | null>(null);
+
+  function toggleMenu(name: string) {
+    openMenu = openMenu === name ? null : name;
+  }
+
+  function nav(route: string) {
+    goto('/ui-kit/app/' + route);
+    openMenu = null;
+  }
+
+  function closeMenu() {
+    openMenu = null;
+  }
+
+  const menus: Record<string, { label: string; route: string }[]> = {
+    'My Activity': [
+      { label: '📋 My Requests',     route: 'my-requests' },
+      { label: '✨ My Offers',        route: 'my-offers' },
+      { label: '👤 My Profile',       route: 'my-profile' },
+      { label: '🏛️ My Organizations', route: 'my-organizations' },
+    ],
+    'Community': [
+      { label: '👥 Members',          route: 'members' },
+      { label: '🏢 Organizations',    route: 'organizations' },
+    ],
+    'Resources': [
+      { label: '🏷️ Service Types',    route: 'service-types' },
+      { label: '💛 Mediums',          route: 'mediums' },
+    ],
+  };
 </script>
 
-<header class="flex items-center gap-3 px-4 py-2 bg-primary-500 text-white shadow-md">
+<!-- Close dropdown on outside click -->
+<svelte:document onclick={closeMenu} />
+
+<header class="relative flex items-center gap-3 px-4 py-2 bg-primary-500 text-white shadow-md">
   <!-- Brand -->
   <div class="flex items-center gap-2 shrink-0">
     {#if logoSrc}
@@ -48,12 +81,35 @@
     💡 Offers
   </button>
 
-  <!-- Dropdown nav groups (visual placeholders) -->
+  <!-- Dropdown nav groups -->
   <nav class="hidden md:flex items-center gap-1 flex-1">
-    {#each dropdownGroups as group}
-      <button class="btn btn-sm text-white/80 hover:text-white hover:bg-white/10 gap-1">
-        {group} <span class="text-xs opacity-60">▾</span>
-      </button>
+    {#each Object.entries(menus) as [name, items]}
+      <div class="relative">
+        <button
+          class="btn btn-sm text-white/80 hover:text-white hover:bg-white/10 gap-1"
+          onclick={(e) => { e.stopPropagation(); toggleMenu(name); }}
+        >
+          {name} <span class="text-xs opacity-60 transition-transform {openMenu === name ? 'rotate-180' : ''}">▾</span>
+        </button>
+
+        {#if openMenu === name}
+          <div
+            class="absolute top-full left-0 mt-1 z-50 min-w-[180px] rounded-lg bg-white shadow-lg border border-surface-200 py-1 overflow-hidden"
+            onclick={(e) => e.stopPropagation()}
+            role="menu"
+          >
+            {#each items as item}
+              <button
+                class="w-full text-left px-4 py-2 text-sm text-surface-800 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                onclick={() => nav(item.route)}
+                role="menuitem"
+              >
+                {item.label}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     {/each}
   </nav>
 

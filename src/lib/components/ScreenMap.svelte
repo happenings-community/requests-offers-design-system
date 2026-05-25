@@ -120,7 +120,7 @@
     tabindex="-1"
   >
     <div
-      class="card variant-filled-surface m-4 w-full max-w-3xl max-h-[85vh] overflow-y-auto p-6"
+      class="card bg-white m-4 w-full max-w-3xl max-h-[85vh] overflow-y-auto p-6 shadow-xl"
       role="presentation"
       onclick={(e) => e.stopPropagation()}
     >
@@ -132,28 +132,28 @@
       <div class="flex flex-col gap-6">
         {#each sections as section}
           <div>
-            <div class="mb-2 text-xs font-bold uppercase tracking-wider opacity-50">{section.label}</div>
+            <div class="mb-2 text-xs font-bold uppercase tracking-widest text-surface-600">{section.label}</div>
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {#each section.screens as screen}
                 {#if screen.status === 'upcoming'}
-                  <div class="card variant-ghost p-3 text-left opacity-50 cursor-not-allowed relative">
+                  <div class="card bg-surface-100 border border-surface-200 p-3 text-left opacity-60 cursor-not-allowed relative">
                     <div class="text-xl mb-1">{screen.icon}</div>
-                    <div class="text-sm font-semibold flex items-center gap-1">
+                    <div class="text-sm font-semibold text-surface-700 flex items-center gap-1">
                       {screen.label}
                       <span class="badge variant-soft-warning text-[10px] px-1 py-0">⏳</span>
                     </div>
-                    <div class="text-xs opacity-60">{screen.desc}</div>
+                    <div class="text-xs text-surface-500">{screen.desc}</div>
                   </div>
                 {:else}
                   <button
-                    class="card p-3 text-left transition-colors {isActive(screen.route)
-                      ? 'variant-filled-primary'
-                      : 'variant-ghost hover:variant-soft-surface'}"
+                    class="card p-3 text-left transition-colors border {isActive(screen.route)
+                      ? 'variant-filled-primary border-primary-600'
+                      : 'bg-white border-surface-200 hover:border-primary-300 hover:bg-primary-50 text-surface-900'}"
                     onclick={() => open_screen(screen)}
                   >
                     <div class="text-xl mb-1">{screen.icon}</div>
                     <div class="text-sm font-semibold">{screen.label}</div>
-                    <div class="text-xs opacity-60">{screen.desc}</div>
+                    <div class="text-xs {isActive(screen.route) ? 'opacity-80' : 'text-surface-500'}">{screen.desc}</div>
                   </button>
                 {/if}
               {/each}
