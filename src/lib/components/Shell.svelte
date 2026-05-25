@@ -36,7 +36,7 @@
     <Navbar {appName} {logoSrc} {showAdmin} />
   {/if}
 
-  <main class="flex-1 p-4">
+  <main class="{isAdmin ? 'flex-1' : 'flex-1 p-4'}">
     {@render children()}
   </main>
 
